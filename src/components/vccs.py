@@ -7,38 +7,27 @@ class VCCS(Component):
     # Khai bao VCCS giua node i va j, dieu khien boi dien ap giua node k va l
     def __init__(self, name, np, nm, ncp, ncm, value):
         self.name = name
-        self.n_p = np
-        self.n_m = nm
-        self.nc_p = ncp
-        self.nc_m = ncm
+        self.n_p = np    # output +
+        self.n_m = nm    # output -
+        self.nc_p = ncp  # control +
+        self.nc_m = ncm  # control -
         self.Gm = value  # Transconductance (S)
 
 
-    # Mo hinh linear VCCS
-    def _stamp_linear(self, G, Gm):
-        # Ma tran dan nap G
-        if self.n_p != None and self.nc_p != None:
-            G[self.n_p][self.nc_p] += Gm
+    def stamp(self, A, z, ctx):
+        # Stamp A
+        if self.n_p is not None and self.nc_p is not None:
+            A[self.n_p, self.nc_p] += self.Gm
 
-        if self.n_p != None and self.nc_m != None:
-            G[self.n_p][self.nc_m] -= Gm
+        if self.n_p is not None and self.nc_m is not None:
+            A[self.n_p, self.nc_m] -= self.Gm
 
-        if self.n_m != None and self.nc_p != None:
-            G[self.n_m][self.nc_p] -= Gm
+        if self.n_m is not None and self.nc_p is not None:
+            A[self.n_m, self.nc_p] -= self.Gm
 
-        if self.n_m != None and self.nc_m != None:
-            G[self.n_m][self.nc_m] += Gm
+        if self.n_m is not None and self.nc_m is not None:
+            A[self.n_m, self.nc_m] += self.Gm
 
-
-    # Mo hinh DC
-    def stamp_dc(self, G, b, ctx):
-        self._stamp_linear(G, self.Gm)
-
-
-    # Mo hinh AC
-    def stamp_ac(self, G, b, ctx):
-        self._stamp_linear(G, self.Gm)
-    
 
     # Hien thi thong tin linh kien (cho debug)
     def __repr__(self):

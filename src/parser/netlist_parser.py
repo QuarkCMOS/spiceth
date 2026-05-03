@@ -1,8 +1,5 @@
 # parser/netlist_parser.py
 
-# Doc linh kien tu netlist va tao object Circuit
-# Tao danh sach linh kien va index node
-
 import numpy as np
 
 from components.resistor import Resistor
@@ -221,41 +218,76 @@ def parse_netlist(file_name):
                     circuit.add_component(comp)
 
 
-            # Lenh config che do AC
-            # .AC DEC 10 1 1e6
+            # Lenh config che do
             elif tokens[0].startswith('.'):
                 directive = tokens[0].lower()
 
+                # Che do AC
+                # .AC DEC 10 1 1e6
                 if directive == ".ac":
                     if len(tokens) != 5:
                         raise ValueError("Invalid .AC syntax")
 
-                _, sweep_type, points_str, f_start_str, f_end_str = tokens
+                    _, sweep_type, points_str, f_start_str, f_end_str = tokens
 
-                sweep_type = sweep_type.upper()
-                points = int(points_str)
-                f_start = parse_value(f_start_str)
-                f_end = parse_value(f_end_str)
+                    sweep_type = sweep_type.upper()
+                    points = int(points_str)
+                    f_start = parse_value(f_start_str)
+                    f_end = parse_value(f_end_str)
 
-                if sweep_type not in ["DEC", "LIN", "OCT"]:
-                    raise ValueError(f"Unknown sweep type: {sweep_type}")
+                    # Loi sai lenh config
+                    if sweep_type not in ["DEC", "LIN", "OCT"]:
+                        raise ValueError(f"Unknown sweep type: {sweep_type}")
 
-                if f_start <= 0:
-                    raise ValueError("f_start must be > 0")
+                    if f_start <= 0:
+                        raise ValueError("f_start must be > 0")
 
-                if f_end <= f_start:
-                    raise ValueError("f_end must be > f_start")
+                    if f_end <= f_start:
+                        raise ValueError("f_end must be > f_start")
 
-                if points <= 0:
-                    raise ValueError("points must be > 0")
+                    if points <= 0:
+                        raise ValueError("points must be > 0")
 
-                circuit.circuit_analysis = {
-                    "type": "ac",
-                    "sweep": sweep_type,
-                    "points": points,
-                    "f_start": f_start,
-                    "f_end": f_end
-                }
+                    circuit.circuit_analysis = {
+                        "type": "ac",
+                        "sweep": sweep_type,
+                        "points": points,
+                        "f_start": f_start,
+                        "f_end": f_end
+                    }
+
+                # Che do Transient
+                # .TRAN 1u 10m
+                elif directive == ".tran":
+                    if len(tokens) < 3:
+                        raise ValueError("Invalid .TRAN syntax")
+                    
+                    tstep = parse_value(tokens[1])
+                    tstop = parse_value(tokens[2])
+
+                    tstart = 0.0
+                    tmax = tstep
+
+                    if len(tokens) >= 4:
+                        tstart = parse_value(tokens[3])
+                    if len(tokens) >= 5:
+                        tmax = parse_value(tokens[4])
+
+                    # Loi value .TRAN
+                    if tstep <= 0:
+                        raise ValueError("tstep must be > 0")
+                    if tstop <= 0:
+                        raise ValueError("tstop must be > 0")
+                    if tstop <= tstart:
+                        raise ValueError("tstop must be > tstart ")
+
+                    circuit.circuit_analysis = {
+                        "type": "tran",
+                        "tstep": tstep,
+                        "tstop": tstop,
+                        "tstart": tstart,
+                        "tmax": tmax
+                    }
 
             # Khong xac dinh duoc syntax
             else:

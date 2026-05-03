@@ -35,3 +35,20 @@ def plot_bode(results, vin_idx, vout_idx, title="Bode plot"):
     plt.grid(True, which="both")
 
     plt.show()
+
+
+# Plot Transient response
+def plot_tran(results, node_idx=1, node_name=None):
+    times = [t for t, _ in results]
+    values = [x[node_idx] for _, x in results]
+
+    label = node_name if node_name else f"node {node_idx}"
+
+    plt.figure()
+    plt.plot(times, values, label=label)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Voltage (V)")
+    plt.title("Transient Response")
+    plt.legend()
+    plt.grid()
+    plt.show()

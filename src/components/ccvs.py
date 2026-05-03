@@ -1,8 +1,6 @@
 # components/ccvs.py
 # Current-Controlled Voltage Source (CCVS)
 
-import numpy as np
-
 from components.base import Component
 
 class CCVS(Component):
@@ -11,39 +9,30 @@ class CCVS(Component):
         self.name = name
         self.n_p = np
         self.n_m = nm
-        self.Vctrl = Vctrl
-        self.Rm = value # Resistance
+        self.Vctrl = Vctrl # Ten nguon ap dieu khien
+        self.Rm = value # Tranresistance
 
 
-    # Mo hinh linear CCVS
-    def _stamp_linear(self, G, Rm, ctx):
+    def stamp(self, A, z, ctx):
         if self.Vctrl not in ctx.vs_index:
             raise ValueError(f"{self.name}: control source {self.Vctrl} not found")
-        
         if self.name not in ctx.vs_index:
             raise ValueError(f"{self.name}: CCVS not indexed")
+        
+        k_ctrl = ctx.vs_index[self.Vctrl]  # dong dien khien
+        k = ctx.vs_index[self.name]        # bien dong
 
-        k_ctrl = ctx.vs_index[self.Vctrl]
-        Ie_idx = ctx.vs_index[self.name]
-
-        # Ma tran G
+        # Stamp A
         if self.n_p is not None:
-            G[self.n_p][Ie_idx] += 1
-            G[Ie_idx][self.n_p] += 1
+            A[self.n_p, k] += 1
+            A[k, self.n_p] += 1
 
         if self.n_m is not None:
-            G[self.n_m][Ie_idx] -= 1
-            G[Ie_idx][self.n_m] -= 1
+            A[self.n_m, k] -= 1
+            A[k, self.n_m] -= 1
 
-        G[Ie_idx][k_ctrl] -= Rm
+        A[k, k_ctrl] -= self.Rm
 
-
-
-
-    # Mo hinh DC
-    def stamp_dc(self, G, b, ctx):
-        self._stamp_linear(G, self.Rm, ctx)
-    
 
     # Hien thi thong tin linh kien (cho debug)
     def __repr__(self):

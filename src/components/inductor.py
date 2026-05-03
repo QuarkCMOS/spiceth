@@ -1,48 +1,66 @@
 # components/inductor.py
 
-import numpy as np
 from components.base import Component
 
 class Inductor(Component):
-    # Khai bao cuon cao L giua node i va j
     def __init__(self, name, node_i, node_j, value):
         self.name = name
         self.i = node_i
         self.j = node_j
         self.L = value
 
-
-    # Mo hinh DC (cuon cam xem nhu short circuit)
-    def stamp_dc(self, G, b, ctx):
+    
+    def stamp(self, A, z, ctx):
         if self.name not in ctx.vs_index:
             raise ValueError(f"{self.name}: Inductor not indexed")
 
         k = ctx.vs_index[self.name]
 
-        if self.i != None:
-            G[self.i][k] += 1
-            G[k][self.i] += 1
+        # DC (short circuit)
+        if ctx.mode == "dc":
+            if self.i is not None:
+                A[self.i, k] += 1
+                A[k, self.i] += 1
 
-        if self.j != None:
-            G[self.j][k] -= 1
-            G[k][self.j] -= 1
+            if self.j is not None:
+                A[self.j, k] -= 1
+                A[k, self.j] -= 1
+        
+        # AC   Y = 1/(jωL)
+        elif ctx.mode == "ac":
+            Yl = 1 / (1j * ctx.omega * self.L)
+
+            if self.i is not None:
+                A[self.i, self.i] += Yl
+
+            if self.j is not None:
+                A[self.j, self.j] += Yl
+
+            if self.i is not None and self.j is not None:
+                A[self.i, self.j] -= Yl
+                A[self.j, self.i] -= Yl
+
+        # TRAN   i = i_prev + dt/L * v
+        elif ctx.mode == "tran":
+            g = ctx.dt / self.L
+
+            i_prev = ctx.x_prev[k]
+
+            # Ma tran A
+            if self.i is not None:
+                A[self.i, k] += 1
+                A[k, self.i] -= g
+
+            if self.j is not None:
+                A[self.j, k] -= 1
+                A[k, self.j] += g
+
+            A[k, k] += 1
+
+            # RHS
+            z[k] += i_prev
 
 
-    # Mo hinh AC
-    def stamp_ac(self, G, b, ctx):
-        Yl = 1 / (1j * ctx.omega * self.L)
-
-        if self.i is not None:
-            G[self.i, self.i] += Yl
-
-        if self.j is not None:
-            G[self.j, self.j] += Yl
-
-        if self.i is not None and self.j is not None:
-            G[self.i, self.j] -= Yl
-            G[self.j, self.i] -= Yl
-
-    
     # Hien thi thong tin linh kien (cho debug)
     def __repr__(self):
         return f"Inductor({self.name}, {self.i}, {self.j}, {self.L}) at {hex(id(self))}"

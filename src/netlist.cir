@@ -1,4 +1,4 @@
-R1 1 2 100
-C1 2 0 16u
-V1 1 0 AC 10
-.AC DEC 10 1 1e6
+V1 in 0 DC 12 AC 1e-20
+R1 in out 1k
+C1 out 0 1u
+.AC DEC 10 1e-3 1e6

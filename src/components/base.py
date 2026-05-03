@@ -2,8 +2,8 @@
 
 class Component:
     # Format:
-    def stamp_dc(self, G, b, ctx):
-        # G: Ma tran dan nap
-        # b: Vector dong dien
+    def stamp(self, A, z, ctx):
+        # A: Ma tran bien x
+        # z: Vector dong dien tuong duong
         # ctx: Context cua component
-        raise NotImplementedError("stamp_dc() not implemented")
+        raise NotImplementedError("stamp() not implemented")

@@ -2,15 +2,11 @@
 
 import numpy as np
 
-from mna_builder.stamp_context import StampContext
 from components.voltage_source import VoltageSource
 from components.inductor import Inductor
 from components.vcvs import VCVS
 from components.ccvs import CCVS
 
-# f = 100 # Frequency (Hz)
-# omega = 2 * np.pi * f
-# omega = 2
 
 class MNABuilder:
     def __init__(self, circuit):
@@ -22,12 +18,12 @@ class MNABuilder:
         vs_list = []
         vs_index = {}
 
-        # Liet ke cac nguon ap (VoltageSource, CCVS, VCVS), Inductor o DC coi nhu la short-circuit (VS = 0)
+        # Liet ke cac nguon ap (VoltageSource, CCVS, VCVS) va Inductor
         for comp in self.circuit.components:
             if isinstance(comp, (VoltageSource, VCVS, CCVS)):
                 vs_list.append(comp)
 
-            elif isinstance(comp, Inductor) and mode == "dc":
+            elif isinstance(comp, Inductor) and mode in ["dc", "tran"]:
                 vs_list.append(comp)
 
         # Tao index cho nguon ap trong vector x
@@ -38,44 +34,24 @@ class MNABuilder:
         return vs_index
 
 
-    # Ma tran tuyen tinh
-    def build_linear(self, mode="dc", omega=0.0):
-        self.vs_index = self.build_vs_index(mode)
+    # Ma tran MNA
+    def build(self, ctx):
+        self.vs_index = self.build_vs_index(ctx.mode)
 
         n = len(self.node_map) # So node (khong tinh GND)
-        m = len(self.vs_index) # So bien dong cua nguon ap
+        m = len(self.vs_index)
         size = n + m
 
-        # Kieu du lieu cho mode dc va ac
-        dtype = complex if mode == "ac" else float
+        dtype = complex if ctx.mode == "ac" else float
 
-        # Tao ma tran G, vector b
-        G = np.zeros((size, size), dtype=dtype)
-        b = np.zeros(size, dtype=dtype)
+        # Tao ma tran A, vector z
+        A = np.zeros((size, size), dtype=dtype)
+        z = np.zeros(size, dtype=dtype)
 
-        # Duyet linh kien vao ma tran
-        ctx = StampContext(self.vs_index, omega)
+        # Update ctx (co vs_index moi)
+        ctx.vs_index = self.vs_index
         
         for comp in self.circuit.components:
-            if mode == "dc":
-                comp.stamp_dc(G, b, ctx)
-            elif mode == "ac":
-                comp.stamp_ac(G, b, ctx)
+            comp.stamp(A, z, ctx)
 
-                          
-        # In ma tran G, vector b, index cua nguon ap (cho debug)
-        print("G =\n", G)
-        print("b =\n", b)
-        print("vs_index =\n",self.vs_index)
-
-        return G, b
-
-
-    # Build DC matrix
-    def build_dc(self):
-        return self.build_linear(mode="dc", omega=0)
-
-
-    # Build AC matrix
-    def build_ac(self, omega):
-        return self.build_linear(mode="ac", omega=omega)
+        return A, z

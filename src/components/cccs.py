@@ -1,8 +1,6 @@
 # components/cccs.py
 # Current-Controlled Current Source (CCCS)
 
-import numpy as np
-
 from components.base import Component
 
 class CCCS(Component):
@@ -11,30 +9,22 @@ class CCCS(Component):
         self.name = name
         self.n_p = np
         self.n_m = nm
-        self.Vctrl = Vctrl
+        self.Vctrl = Vctrl # Ten nguon ap dieu khien
         self.A = value # Current gain
 
 
-    # Mo hinh linear CCCS
-    def _stamp_linear(self, G, A, ctx):
-        # Ma tran dan anp G
+    def stamp(self, A, z, ctx):
+        if self.Vctrl not in ctx.vs_index:
+            raise ValueError(f"{self.name}: controlling source {self.Vctrl} not found")
+        
         k_ctrl = ctx.vs_index[self.Vctrl]
 
+        # Stamp A
         if self.n_p is not None:
-            G[self.n_p][k_ctrl] += A
-
+            A[self.n_p, k_ctrl] += self.A
         if self.n_m is not None:
-            G[self.n_m][k_ctrl] -= A
+            A[self.n_m, k_ctrl] -= self.A
 
-
-    # Mo hinh DC
-    def stamp_dc(self, G, b, ctx):
-        self._stamp_linear(G, self.A, ctx)
-
-    
-    # Mo hinh AC
-    def stamp_ac(self, G, b, ctx):
-        self._stamp_linear(G, self.A, ctx)
 
     # Hien thi thong tin linh kien (cho debug)
     def __repr__(self):

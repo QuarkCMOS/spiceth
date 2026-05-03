@@ -3,7 +3,6 @@
 from components.base import Component
 
 class CurrentSource(Component):
-    # Khai bao nguon dong I giua node i va j
     def __init__(self, name, node_i, node_j,
                 dc_value=None,
                 ac_value=None,
@@ -12,29 +11,27 @@ class CurrentSource(Component):
         self.name = name
         self.i = node_i
         self.j = node_j
-        
         self.dc = dc_value
         self.ac = ac_value
         self.tran = transient
 
 
-    # Mo hinh phan tu linear current
-    def _stamp_linear(self, b, I):
-        if self.i != None:
-            b[self.i] -= I
-        if self.j != None:
-            b[self.j] += I
+    def stamp(self, A, z, ctx):
+        if ctx.mode == "dc":
+            I = self.dc if self.dc is not None else 0.0
+        elif ctx.mode == "ac":
+            I = self.ac if self.ac is not None else 0.0
+        elif ctx.mode == "tran":
+            # (Hien tai dung tam DC value)
+            I = self.dc if self.dc is not None else 0.0
+        else:
+            raise ValueError(f"{self.name}: Unknown mode {ctx.mode}")
 
-    
-    # Mo hinh DC
-    def stamp_dc(self, G, b, ctx):
-        self._stamp_linear(b, self.dc)
-
-    
-    # Mo hinh AC
-    def stamp_ac(self, G, b, ctx):
-        self._stamp_linear(b, self.ac)
-
+        # Stamp RHS
+        if self.i is not None:
+            z[self.i] -= I
+        if self.j is not None:
+            z[self.j] += I
 
 
     # Hien thi thong tin linh kien (cho debug)
