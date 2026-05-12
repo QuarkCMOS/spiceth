@@ -11,13 +11,16 @@ class Inductor(Component):
 
     
     def stamp(self, A, z, ctx):
-        if self.name not in ctx.vs_index:
-            raise ValueError(f"{self.name}: Inductor not indexed")
 
-        k = ctx.vs_index[self.name]
+        
 
         # DC (short circuit)
         if ctx.mode == "dc":
+            if self.name not in ctx.vs_index:
+                raise ValueError(f"{self.name}: Inductor not indexed")
+
+            k = ctx.vs_index[self.name]
+
             if self.i is not None:
                 A[self.i, k] += 1
                 A[k, self.i] += 1
@@ -42,23 +45,28 @@ class Inductor(Component):
 
         # TRAN   i = i_prev + dt/L * v
         elif ctx.mode == "tran":
-            g = ctx.dt / self.L
+            if self.name not in ctx.vs_index:
+                raise ValueError(f"{self.name}: Inductor not indexed")
+
+            k = ctx.vs_index[self.name]
+
+            g = self.L / ctx.dt
 
             i_prev = ctx.x_prev[k]
 
             # Ma tran A
             if self.i is not None:
                 A[self.i, k] += 1
-                A[k, self.i] -= g
+                A[k, self.i] += 1
 
             if self.j is not None:
                 A[self.j, k] -= 1
-                A[k, self.j] += g
+                A[k, self.j] -= 1
 
-            A[k, k] += 1
+            A[k, k] -= g
 
             # RHS
-            z[k] += i_prev
+            z[k] -= g *i_prev
 
 
     # Hien thi thong tin linh kien (cho debug)

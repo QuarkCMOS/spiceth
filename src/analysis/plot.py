@@ -12,6 +12,8 @@ def plot_bode(results, vin_idx, vout_idx, title="Bode plot"):
     for f,x in results:
         Vin = x[vin_idx]
         Vout = x[vout_idx]
+        if abs(Vin) < 1e-20:
+            continue
         H = Vout/Vin # Transfer function
 
         freq.append(f)

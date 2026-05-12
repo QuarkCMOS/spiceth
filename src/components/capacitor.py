@@ -35,7 +35,7 @@ class Capacitor(Component):
             v_j_prev = ctx.x_prev[self.j] if self.j is not None else 0.0
             v_prev = v_i_prev - v_j_prev
 
-            Ieq = -g * v_prev
+            Ieq = g * v_prev
 
             # Stamp A
             if self.i is not None:
@@ -50,10 +50,10 @@ class Capacitor(Component):
 
             # Stamp z
             if self.i is not None:
-                z[self.i] -= Ieq
+                z[self.i] += Ieq
 
             if self.j is not None:
-                z[self.j] += Ieq
+                z[self.j] -= Ieq
 
         
     def __repr__(self):

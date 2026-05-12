@@ -21,57 +21,39 @@ class TransientAnalysis:
         tstop  = analysis["tstop"]
         dt     = analysis["tstep"]
 
-        time_points = np.arange(tstart, tstop + dt, dt)
+        time_points = np.arange(tstart + dt, tstop + dt, dt)
 
         # Init state
         vs_index = self.builder.build_vs_index("tran")
-        n = len(self.builder.node_map)
-        m = len(vs_index)
-        size = n + m
 
-        x = np.zeros(size)
-        x_prev = x.copy()
+        # DC Operating point
+        ctx_dc = StampContext(
+            vs_index=vs_index,
+            mode="dc"
+        )
+
+        A_dc, z_dc = self.builder.build(ctx_dc)
+        x = self.solver.solve_linear(A_dc, z_dc)
+        x_prev = np.zeros_like(x) # .IC = 0 
 
         results = []
 
         # Backward Euler loop 
         for t in time_points:
-            # Predictor
-            x_guess = x_prev.copy()
+            ctx = StampContext(
+                vs_index=vs_index,
+                mode="tran",
+                time=t,
+                dt=dt,
+                x_prev=x_prev
+            )
 
-            # Newton loop method
-            for _ in range(MAX_ITER):
-                ctx = StampContext(
-                    mode="tran",
-                    time=t,
-                    dt=dt,
-                    x=x_guess,
-                    x_prev=x_prev
-                )
+            A, z = self.builder.build(ctx)
 
-                A, z = self.builder.build(ctx)\
-                
-                Jac = A
-                Res = A @ x_guess - z
+            # Linear solve (Tạm thời chưa giải bằng Newton)
+            x = self.solver.solve_linear(A, z)
 
-                try:
-                    dx = self.solver.solve_linear(Jac, -Res)
-                except Exception as e:
-                    raise RuntimeError(f"Linear solve failed at t = {t}: {e}")
-                
-                x_guess = x_guess + dx
-
-                # Convergence
-                if np.linalg.norm(dx, np.inf) < TOLERANCE:
-                    break
-
-            else:
-                raise RuntimeError(f"Newton failed to converge at t = {t}")
-            
-            # Accept step
-            x = x_guess
             x_prev = x.copy()
-
             results.append((t, x.copy()))
 
         return results

@@ -32,7 +32,7 @@ def main():
 
     if not analysis:
         print("Warning: No analysis specified. Auto DC mode")
-        analysis["type"] = "dc"
+        analysis = {"type": "dc"}
 
     #  DC 
     if analysis["type"] == "dc":
@@ -55,7 +55,7 @@ def main():
 
         print(">>> DONE:", len(results), "points")
         for f, x in results[:5]:
-            print(f"f = {f:.2f} Hz, x = {x}")
+            print(f"f = {f:.6f} Hz, x = {x}")
         print("...")
 
         print(">>> PLOT BODE")

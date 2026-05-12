@@ -18,6 +18,8 @@ class CCVS(Component):
             raise ValueError(f"{self.name}: control source {self.Vctrl} not found")
         if self.name not in ctx.vs_index:
             raise ValueError(f"{self.name}: CCVS not indexed")
+        if self.Vctrl == self.name:
+            raise ValueError(f"{self.name}: CCVS cannot control itself")
         
         k_ctrl = ctx.vs_index[self.Vctrl]  # dong dien khien
         k = ctx.vs_index[self.name]        # bien dong
