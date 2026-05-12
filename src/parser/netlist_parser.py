@@ -130,6 +130,7 @@ def parse_netlist(file_name):
                     dc_value = 0
                     ac_mag = 0
                     ac_phase = 0
+                    transient = None
 
                     # name n1 n2 dc_value
                     if len(tokens) == 4:
@@ -142,17 +143,17 @@ def parse_netlist(file_name):
 
                         idx = 3
                         while idx < len(tokens):
-                            token = tokens[idx].lower()
+                            key = tokens[idx].lower()
 
                             # Gia tri DC
-                            if token == "dc":
+                            if key == "dc":
                                 if idx + 1 >= len(tokens) or not is_number(tokens[idx + 1]):
                                     raise ValueError(f"{name} invalid DC value")
                                 dc_value = parse_value(tokens[idx + 1])
                                 idx += 2
 
                             # Gia tri AC
-                            elif token == "ac":
+                            elif key == "ac":
                                 if idx + 1 >= len(tokens) or not is_number(tokens[idx + 1]):
                                     raise ValueError(f"{name} invalid AC magnitude")
                                 ac_mag = parse_value(tokens[idx + 1])
@@ -163,9 +164,45 @@ def parse_netlist(file_name):
                                 else:
                                     idx += 2
 
+                            # Gia tri TRANSIENT
+                            # PULSE
+                            elif key == "pulse":
+                                if idx + 7 >= len(tokens):
+                                    raise ValueError(f"{name}: Invalid PULSE")
+                                
+                                transient = {
+                                    "type": "pulse",
+                                    "v1": parse_value(tokens[idx + 1]),
+                                    "v2": parse_value(tokens[idx + 2]),
+                                    "td": parse_value(tokens[idx + 3]),
+                                    "tr": parse_value(tokens[idx + 4]),
+                                    "tf": parse_value(tokens[idx + 5]),
+                                    "pw": parse_value(tokens[idx + 6]),
+                                    "per": parse_value(tokens[idx + 7])
+                                }
+
+                                idx += 8
+
+                            # SIN
+                            elif key == "sin":
+                                if idx + 6 >= len(tokens):
+                                    raise ValueError(f"{name}: Invalid SIN")
+                                
+                                transient = {
+                                    "type": "sin",
+                                    "vo": parse_value(tokens[idx + 1]),
+                                    "va": parse_value(tokens[idx + 2]),
+                                    "freq": parse_value(tokens[idx + 3]),
+                                    "td": parse_value(tokens[idx + 4]),
+                                    "theta": parse_value(tokens[idx + 5]),
+                                    "phase": parse_value(tokens[idx + 6])
+                                }
+
+                                idx += 7
+
                             # Loi type
                             else:
-                                raise ValueError(f"{name} unknown token: {token}")
+                                raise ValueError(f"{name} unknown token: {key}")
 
                     # Loi syntax
                     else:
@@ -180,7 +217,7 @@ def parse_netlist(file_name):
                     ac_value = ac_mag * np.exp(1j * phase_rad)
                     
                     comp_class = component_map[prefix]
-                    comp = comp_class(name, i, j, dc_value, ac_value, transient=None)
+                    comp = comp_class(name, i, j, dc_value, ac_value, transient)
 
                     circuit.add_component(comp)                    
 

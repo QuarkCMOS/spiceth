@@ -1,5 +1,4 @@
-V1 in 0 DC 1
-E1 out 0 in fb 1000
-R1 out fb 10k
-C1 fb 0 1u
-.TRAN 1e-5 0.01
+V1 1 0 sin 1 2 10 0.05 0 30
+R1 1 2 100
+C1 2 0 16u
+.TRAN 1e-5 0.4
