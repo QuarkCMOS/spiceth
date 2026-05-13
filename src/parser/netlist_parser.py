@@ -1,6 +1,7 @@
 # parser/netlist_parser.py
 
 import numpy as np
+import re
 
 from components.resistor import Resistor
 from components.current_source import CurrentSource
@@ -32,11 +33,12 @@ class Circuit:
         self.components = [] # Resistor, CurrentSource, ...
         self.circuit_analysis = {}
         self.next_node_index = 0
+        self.initial_conditions = []
 
 
     # Lay, tao index cua node trong map_node
     def get_node_index(self, node_name):
-        if node_name == "0": # ground node
+        if node_name == "GND": # ground node
             return None
         
         elif node_name not in self.node_map:
@@ -76,6 +78,7 @@ def parse_value(value_str):
     return float(value_str)
 
 
+# Check la so
 def is_number(s):
     try:
         float(s)
@@ -325,6 +328,20 @@ def parse_netlist(file_name):
                         "tstart": tstart,
                         "tmax": tmax
                     }
+
+                # Initial conditions
+                elif directive == ".ic":
+                    for token in tokens[1:]:
+                        m = re.match(r'([VI])\((.*?)\)=(.*)', token, re.IGNORECASE)
+
+                        if not m:
+                            raise ValueError(f"Invalid .IC syntax: {token}")
+                        
+                        kind = m.group(1).upper()
+                        name = m.group(2)
+                        value = parse_value(m.group(3))
+
+                        circuit.initial_conditions.append((kind, name, value))
 
             # Khong xac dinh duoc syntax
             else:

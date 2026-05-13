@@ -25,18 +25,23 @@ class TransientAnalysis:
 
         # Init state
         vs_index = self.builder.build_vs_index("tran")
+        size = len(self.circuit.node_map) + len(vs_index)
+        x_prev = np.zeros(size) # Default .IC = 0 
 
-        # DC Operating point
-        ctx_dc = StampContext(
-            vs_index=vs_index,
-            mode="dc"
-        )
+        for kind, name, value in self.circuit.initial_conditions:
+            if kind == "V":
+                if name not in self.circuit.node_map:
+                    raise ValueError(f".IC unknown node: {name}")
+                idx = self.circuit.node_map[name]
+                x_prev[idx] = value
 
-        A_dc, z_dc = self.builder.build(ctx_dc)
-        x = self.solver.solve_linear(A_dc, z_dc)
-        x_prev = np.zeros_like(x) # .IC = 0 
+            if kind == "I":
+                if name not in self.circuit.node_map:
+                    raise ValueError(f".IC unknown branch current: {name}")
+                idx = vs_index[name]
+                x_prev[idx] = value
 
-        results = []
+        results = [(tstart, x_prev.copy())]
 
         # Backward Euler loop 
         for t in time_points:
