@@ -40,14 +40,14 @@ def plot_bode(results, vin_idx, vout_idx, title="Bode plot"):
 
 
 # Plot Transient response
-def plot_tran(results, node_idx=1, node_name=None):
+def plot_tran(results, in_idx=0, out_idx=1):
     times = [t for t, _ in results]
-    values = [x[node_idx] for _, x in results]
-
-    label = node_name if node_name else f"node {node_idx}"
+    input = [x[in_idx] for _, x in results]
+    output = [x[out_idx] for _, x in results]
 
     plt.figure()
-    plt.plot(times, values, label=label)
+    plt.plot(times, input, label="input")
+    plt.plot(times, output, label="output")
     plt.xlabel("Time (s)")
     plt.ylabel("Voltage (V)")
     plt.title("Transient Response")

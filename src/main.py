@@ -71,12 +71,12 @@ def main():
 
         print(">>> DONE:", len(results), "points")
 
-        for t, x in results[:5]:
+        for t, x in results[:10]:
             print(f"t = {t:.6f}, x = {x}")
         print("...")
 
         print(">>> PLOT TRANSIENT")
-        plot_tran(results, 1, "out")
+        plot_tran(results, 0, 1)
         return
 
 

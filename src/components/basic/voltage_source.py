@@ -1,4 +1,4 @@
-# components/voltage_source.py
+# components/basic/voltage_source.py
 
 import numpy as np
 

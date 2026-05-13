@@ -1,4 +1,4 @@
-# components/vccs.py
+# components/controlled/vccs.py
 # Voltage-Controlled Current Source (VCCS)
 
 from components.base import Component

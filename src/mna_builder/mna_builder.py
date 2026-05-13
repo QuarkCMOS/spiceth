@@ -2,17 +2,21 @@
 
 import numpy as np
 
-from components.voltage_source import VoltageSource
-from components.inductor import Inductor
-from components.vcvs import VCVS
-from components.ccvs import CCVS
+from components.basic.voltage_source import VoltageSource
+from components.basic.inductor import Inductor
+from components.controlled.vcvs import VCVS
+from components.controlled.ccvs import CCVS
 
 
 class MNABuilder:
     def __init__(self, circuit):
         self.circuit = circuit
         self.node_map = circuit.node_map
+        self.vs_index = {}
 
+    def prepare(self, mode):
+        self.vs_index = self.build_vs_index(mode)
+        return self.vs_index
 
     def build_vs_index(self, mode):
         vs_list = []
@@ -48,7 +52,6 @@ class MNABuilder:
         A = np.zeros((size, size), dtype=dtype)
         z = np.zeros(size, dtype=dtype)
 
-        # Update ctx (co vs_index moi)
         ctx.vs_index = self.vs_index
         
         for comp in self.circuit.components:

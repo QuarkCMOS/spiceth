@@ -1,4 +1,4 @@
-# components/vcvs.py
+# components/controlled/vcvs.py
 # Voltage-Controlled Voltage Source (VCVS)
 
 from components.base import Component

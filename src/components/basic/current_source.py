@@ -1,4 +1,4 @@
-# components/current_source.py
+# components/basic/current_source.py
 
 import numpy as np
 

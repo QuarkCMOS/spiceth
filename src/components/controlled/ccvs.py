@@ -1,4 +1,4 @@
-# components/ccvs.py
+# components/controlled/ccvs.py
 # Current-Controlled Voltage Source (CCVS)
 
 from components.base import Component

@@ -3,15 +3,17 @@
 import numpy as np
 import re
 
-from components.resistor import Resistor
-from components.current_source import CurrentSource
-from components.voltage_source import VoltageSource
-from components.capacitor import Capacitor
-from components.inductor import Inductor
-from components.vccs import VCCS
-from components.vcvs import VCVS
-from components.cccs import CCCS
-from components.ccvs import CCVS
+from components.basic.resistor import Resistor
+from components.basic.current_source import CurrentSource
+from components.basic.voltage_source import VoltageSource
+from components.basic.capacitor import Capacitor
+from components.basic.inductor import Inductor
+from components.controlled.vccs import VCCS
+from components.controlled.vcvs import VCVS
+from components.controlled.cccs import CCCS
+from components.controlled.ccvs import CCVS
+from components.nonlinear.diode import Diode
+from models.diode_model import DiodeModel
 
 
 component_map = {
@@ -23,7 +25,8 @@ component_map = {
     'G': VCCS,
     'E': VCVS,
     'F': CCCS,
-    'H': CCVS
+    'H': CCVS,
+    'D': Diode
 }
 
 class Circuit:
@@ -34,6 +37,7 @@ class Circuit:
         self.circuit_analysis = {}
         self.next_node_index = 0
         self.initial_conditions = []
+        self.models = {}
 
 
     # Lay, tao index cua node trong map_node
@@ -257,8 +261,21 @@ def parse_netlist(file_name):
 
                     circuit.add_component(comp)
 
+                # Diode
+                elif prefix == "D":
+                    _, anode, cathode, model_name = tokens
 
-            # Lenh config che do
+                    a = circuit.get_node_index(anode)
+                    c = circuit.get_node_index(cathode)
+                    model = circuit.models[model_name]
+
+                    comp_class = component_map[prefix]
+                    comp = comp_class(name, a, c, model)
+
+                    circuit.add_component(comp)
+
+
+            # Lenh config
             elif tokens[0].startswith('.'):
                 directive = tokens[0].lower()
 
@@ -332,7 +349,7 @@ def parse_netlist(file_name):
                 # Initial conditions
                 elif directive == ".ic":
                     for token in tokens[1:]:
-                        m = re.match(r'([VI])\((.*?)\)=(.*)', token, re.IGNORECASE)
+                        m = re.match(r"([VI])\((.*?)\)=(.*)", token, re.IGNORECASE)
 
                         if not m:
                             raise ValueError(f"Invalid .IC syntax: {token}")
@@ -342,6 +359,37 @@ def parse_netlist(file_name):
                         value = parse_value(m.group(3))
 
                         circuit.initial_conditions.append((kind, name, value))
+
+                # Model
+                elif directive == ".model":
+                    m = re.match(r"\.model\s+(\w+)\s+(\w+)\((.*)\)", line, re.IGNORECASE)
+
+                    if not m:
+                        raise ValueError(f"Invalid .MODEL syntax: {line}")
+                    
+                    model_name = m.group(1)
+                    model_type = m.group(2).upper()
+                    params_str = m.group(3)
+
+                    params = {}
+
+                    for item in params_str.split():
+                        key, value = item.split("=")
+
+                        params[key.lower()] = parse_value(value)
+
+                    # Tao model object
+                    if model_type == "D":
+                        model = DiodeModel(
+                            name=model_name,
+                            Is=params.get("is", 1e-14),
+                            n=params.get("n", 1.0)
+                        )
+
+                        circuit.models[model_name] = model
+
+                    else:
+                        raise ValueError(f"Unsupported model type: {model_type}")
 
             # Khong xac dinh duoc syntax
             else:

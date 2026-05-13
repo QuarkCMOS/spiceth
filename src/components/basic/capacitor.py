@@ -1,4 +1,4 @@
-# components/capacitor.py
+# components/basic/capacitor.py
 
 from components.base import Component
 

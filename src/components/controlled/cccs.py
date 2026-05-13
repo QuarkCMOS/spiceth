@@ -1,4 +1,4 @@
-# components/cccs.py
+# components/controlled/cccs.py
 # Current-Controlled Current Source (CCCS)
 
 from components.base import Component

@@ -1,4 +1,4 @@
-# components/resistor.py
+# components/basic/resistor.py
 
 from components.base import Component
 

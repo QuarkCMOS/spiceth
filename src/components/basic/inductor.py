@@ -1,4 +1,4 @@
-# components/inductor.py
+# components/basic/inductor.py
 
 from components.base import Component
 

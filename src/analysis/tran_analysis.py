@@ -23,7 +23,7 @@ class TransientAnalysis:
 
         time_points = np.arange(tstart + dt, tstop + dt, dt)
 
-        # Init state
+        # Initial conditions
         vs_index = self.builder.build_vs_index("tran")
         size = len(self.circuit.node_map) + len(vs_index)
         x_prev = np.zeros(size) # Default .IC = 0 
@@ -43,22 +43,45 @@ class TransientAnalysis:
 
         results = [(tstart, x_prev.copy())]
 
-        # Backward Euler loop 
+        # Backward Euler loop (time stepping)
         for t in time_points:
-            ctx = StampContext(
-                vs_index=vs_index,
-                mode="tran",
-                time=t,
-                dt=dt,
-                x_prev=x_prev
-            )
+            # Predictor
+            x_guess = x_prev.copy()
 
-            A, z = self.builder.build(ctx)
+            # Newton loop (nonlinear solve)
+            for _ in range(MAX_ITER):
+                ctx = StampContext(
+                    vs_index=vs_index,
+                    mode="tran",
+                    time=t,
+                    dt=dt,
+                    x=x_guess,
+                    x_prev=x_prev
+                )
 
-            # Linear solve (Tạm thời chưa giải bằng Newton)
-            x = self.solver.solve_linear(A, z)
+                A, z = self.builder.build(ctx)
 
-            x_prev = x.copy()
-            results.append((t, x.copy()))
+                # Residual:
+                # F(x) = A(x) - z(x)
+                Res = A @ x_guess - z
+
+                try:
+                    dx = self.solver.solve_linear(A, -Res)
+                except Exception as e:
+                    raise RuntimeError(f"Linear solve failed at t={t}: {e}")
+
+                x_guess += dx
+
+                # Convergence check
+                if np.linalg.norm(dx, np.inf) < TOLERANCE:
+                    break
+
+            else:
+                raise RuntimeError(f"Newton failed at t={t}")
+            
+            # Accept timestep
+            x_prev = x_guess.copy()
+
+            results.append((t, x_prev.copy()))
 
         return results
