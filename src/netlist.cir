@@ -1,5 +1,5 @@
 .model DFAST D(Is=1e-6 n=1)
-V1 n0 GND sin 0.0 1 10 0.0 0 30
+V1 n0 GND sin 20 100 10 0.0 0 30
 D1 n0 n1 DFAST
 C1 n1 GND 10u
 R1 n1 GND 100k

@@ -49,7 +49,7 @@ class TransientAnalysis:
             x_guess = x_prev.copy()
 
             # Newton loop (nonlinear solve)
-            for _ in range(MAX_ITER):
+            for iter_count in range(MAX_ITER):
                 ctx = StampContext(
                     vs_index=vs_index,
                     mode="tran",
@@ -70,6 +70,10 @@ class TransientAnalysis:
                 except Exception as e:
                     raise RuntimeError(f"Linear solve failed at t={t}: {e}")
 
+                # Damping giảm dần theo iteration
+                # alpha = 1.0 / (1 + iter_count * 0.1)   # hoặc đơn giản hơn:
+                # alpha = min(1.0, 0.1 + iter_count * 0.05)
+                # x_guess += alpha * dx
                 x_guess += dx
 
                 # Convergence check

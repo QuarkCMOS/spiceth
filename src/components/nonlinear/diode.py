@@ -21,12 +21,30 @@ class Diode(Component):
         v_c = ctx.x[self.c] if self.c is not None else 0.0
         Vd  = v_a - v_c
 
-        #Vlim = n * Vt * 40  # ~1.04V với n=1, Vt=0.02585
-        #if Vd > Vlim:
-        #    Vd = Vlim
+        v_a_prev = ctx.x_prev[self.a]
+        v_c_prev = ctx.x_prev[self.c]
+        Vd_prev = v_a_prev - v_c_prev
 
-        Id = Is * (np.exp(Vd / (n * Vt)) - 1)
-        Gd = Is / (n * Vt) * np.exp(Vd / (n * Vt))
+        # Voltage limiting
+        # Giới hạn bước nhảy Vd theo từng Newton iteration
+        V_LIMIT = 3 * n * Vt
+        dv = np.clip(Vd - Vd_prev, -V_LIMIT, V_LIMIT)
+        Vd = Vd_prev + dv
+
+        # Exponential limiting: tuyến tính hoá khi Vd quá lớn
+        # Ngưỡng này phải đủ cao để diode mô hình đúng (~0.7V trở lên)
+        V_CRIT = n * Vt * np.log(n * Vt / (np.sqrt(2) * Is))  # SPICE Vcrit
+        if Vd > V_CRIT:
+            # Linearise exp quanh Vcrit để tránh overflow
+            exp_crit = np.exp(V_CRIT / (n * Vt))
+            arg = exp_crit * (1 + (Vd - V_CRIT) / (n * Vt))
+        else:
+            arg = np.exp(np.clip(Vd / (n * Vt), -500, 500))
+        # arg = np.exp(Vd/(n*Vt))
+
+        Id  = Is * (arg - 1)
+        Gd  = Is / (n * Vt) * arg
+        Gd  = max(Gd, 1e-12)   # tránh Gd = 0
         Ieq = Id - Gd * Vd
 
         # Stamp A
