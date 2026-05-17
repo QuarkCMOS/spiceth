@@ -11,6 +11,12 @@ from mna_builder.stamp_context import StampContext
 from analysis.plot import plot_bode
 from analysis.plot import plot_tran
 
+PLOT_TRAN_V1ST = 0
+PLOT_TRAN_V2ND = 1
+
+PLOT_AC_IN = 0
+PLOT_AC_OUT = 1
+
 
 def main():
     circuit = parse_netlist("netlist.cir")
@@ -59,7 +65,7 @@ def main():
         print("...")
 
         print(">>> PLOT BODE")
-        plot_bode(results, 0, 1)
+        plot_bode(results, PLOT_AC_IN, PLOT_AC_OUT)
         return
 
     #  TRANSIENT ANALYSIS
@@ -76,7 +82,7 @@ def main():
         print("...")
 
         print(">>> PLOT TRANSIENT")
-        plot_tran(results, 0, 1)
+        plot_tran(results, PLOT_TRAN_V1ST, PLOT_TRAN_V2ND)
         return
 
 

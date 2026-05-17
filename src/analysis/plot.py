@@ -46,8 +46,8 @@ def plot_tran(results, in_idx=0, out_idx=1):
     output = [x[out_idx] for _, x in results]
 
     plt.figure()
-    plt.plot(times, input, label="input")
-    plt.plot(times, output, label="output")
+    plt.plot(times, input, label="1st")
+    plt.plot(times, output, label="2nd")
     plt.xlabel("Time (s)")
     plt.ylabel("Voltage (V)")
     plt.title("Transient Response")
