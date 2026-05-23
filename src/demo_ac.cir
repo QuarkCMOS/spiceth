@@ -1,0 +1,5 @@
+* Demo: RC low-pass filter  fc = 1/(2*pi*R*C) = 159 Hz
+V1  in   GND  AC 1
+R1  in   out  1k
+C1  out  GND  1u
+.AC DEC 20 10 100k

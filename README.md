@@ -1,7 +1,20 @@
-# SpiceTH
+### Bước 1: Build
+```ssh
+g++ main.cpp -I . -I D:/ADMIN/eigen-5.0.0 -std=c++17 -O2 -o circuit_engine
+```
 
-## Giới thiệu
-
-SpiceTH là một project mô phỏng mạch điện đơn giản sử dụng phương pháp **Modified Nodal Analysis (MNA)**.
-Chương trình hỗ trợ phân tích mạch ở chế độ **DC**, **AC** và **TRANSIENT**, với các phần tử cơ bản như R, L, C, các nguồn độc lập I, V các nguồn phụ thuộc CCCS, CCVS, VCCS, VCVS.
-
+### Bước 2: RUN
+3 mode:
+- JSON stdout (cho C# đọc):
+```ssh
+./circuit_engine my.cir
+```
+- Bảng DC + ASCII waveform terminal:
+```ssh
+./circuit_engine my.cir --human          
+```
+- Vẽ đồ thị bằng HTML:
+```ssh
+./circuit_engine my.cir --plot              # Chrome/Edge
+./circuit_engine my.cir --plot out.html     # ghi ra file cụ thể
+```

@@ -1,0 +1,7 @@
+* Demo: RC charging + pulse source
+V1  vp   GND  PULSE 0 5 0 10n 10n 500u 1m
+R1  vp   n1   1k
+C1  n1   GND  1u
+R2  n1   n2   2k
+C2  n2   GND  500n
+.TRAN 5u 3m

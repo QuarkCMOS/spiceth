@@ -1,0 +1,10 @@
+* Demo: DC voltage divider + VCCS
+* V1 = 10V, R1+R2 voltage divider, G1 = VCCS buffer
+
+V1  vcc  GND  10
+R1  vcc  mid  3k
+R2  mid  GND  7k
+
+* VCCS: G1 amplifies V(mid) by Gm=0.002 into out node
+G1  out  GND  mid  GND  0.002
+R3  out  GND  500
