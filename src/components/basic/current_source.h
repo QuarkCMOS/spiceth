@@ -36,6 +36,8 @@ public:
     }
 
     std::string type_name() const override { return "CurrentSource"; }
+    void   set_dc_value(double v) { dc_ = v; }
+    double dc_value()       const { return dc_; }
 
 private:
     std::optional<int> i_, j_;

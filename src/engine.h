@@ -3,7 +3,7 @@
  * engine.h  –  Single public header for the CircuitEngine.
  *
  * C# / WPF integration options:
- *   A) P/Invoke via a thin C-export DLL (see engine_capi.h).
+ *   A) P/Invoke via a thin C-export DLL.
  *   B) C++/CLI wrapper (include this header from a managed C++ project).
  *   C) JSON bridge: call the engine from a CLI subprocess, parse stdout JSON.
  *
@@ -37,6 +37,7 @@ inline SimulationResult simulate(Circuit& circuit,
                                   Solver& solver)
 {
     switch (circuit.analysis.type) {
+    case AnalysisType::OP:
     case AnalysisType::DC:
         return DCAnalysis(circuit, builder, solver).run();
     case AnalysisType::AC:

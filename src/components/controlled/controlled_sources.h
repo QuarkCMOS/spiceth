@@ -6,7 +6,7 @@
 
 namespace CircuitEngine {
 
-// ── VCVS ──────────────────────────────────────────────────────────
+// VCVS
 class VCVS : public Component {
 public:
     VCVS(std::string name,
@@ -38,7 +38,7 @@ private:
     }
 };
 
-// ── VCCS ──────────────────────────────────────────────────────────
+// VCCS
 class VCCS : public Component {
 public:
     VCCS(std::string name,
@@ -66,7 +66,7 @@ private:
     double Gm_;
 };
 
-// ── CCVS ──────────────────────────────────────────────────────────
+// CCVS
 class CCVS : public Component {
 public:
     CCVS(std::string name,
@@ -101,7 +101,7 @@ private:
     double Rm_;
 };
 
-// ── CCCS ──────────────────────────────────────────────────────────
+// CCCS
 class CCCS : public Component {
 public:
     CCCS(std::string name,
@@ -116,8 +116,10 @@ public:
         if (!ctx.vs_index || !ctx.vs_index->count(vctrl_))
             throw std::runtime_error(name_ + ": controlling source " + vctrl_ + " not found");
         int k_ctrl = ctx.vs_index->at(vctrl_);
-        if (n_p_) A(n_p_.value(), k_ctrl) += A_;
-        if (n_m_) A(n_m_.value(), k_ctrl) -= A_;
+        // I_out = A_ * I(vctrl); current flows INTO n_p and OUT of n_m.
+        // KCL at n_p: conductances sum = +I_out → A(n_p, k_ctrl) -= A_ (current into node subtracts from LHS)
+        if (n_p_) A(n_p_.value(), k_ctrl) -= A_;
+        if (n_m_) A(n_m_.value(), k_ctrl) += A_;
     }
 
     std::string type_name() const override { return "CCCS"; }

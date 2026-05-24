@@ -32,7 +32,7 @@
 
 using namespace CircuitEngine;
 
-// ── ANSI colours (disabled on Windows without VT mode) ─────────────
+// ANSI colours (disabled on Windows without VT mode)
 #ifdef _WIN32
   static void enable_ansi() {
       HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -56,7 +56,7 @@ using namespace CircuitEngine;
   #define COL_BOLD   "\033[1m"
 #endif
 
-// ── Engineering suffix ───────────────────────────────────────────────
+// Engineering suffix
 static std::string eng(double v, const char* unit)
 {
     char buf[64];
@@ -73,8 +73,8 @@ static std::string eng(double v, const char* unit)
     return buf;
 }
 
-// ── DC pretty-print ──────────────────────────────────────────────────
-static void print_dc(const SimulationResult& r)
+// .OP: single operating point table
+static void print_op(const SimulationResult& r)
 {
     if (r.data.empty()) return;
     const auto& pt = r.data[0];
@@ -84,26 +84,24 @@ static void print_dc(const SimulationResult& r)
         if (nv.type == "voltage") volts.push_back(&nv);
         else                      amps .push_back(&nv);
     }
-    auto byName = [](const NodeValue* a, const NodeValue* b){ return a->name < b->name; };
-    std::sort(volts.begin(), volts.end(), byName);
-    std::sort(amps .begin(), amps .end(), byName);
 
     std::cout << "\n" << COL_BOLD << COL_CYAN
-              << "+===========================================+\n"
-              << "|         DC Operating Point                |\n"
-              << "+===========================================+" << COL_RESET << "\n\n";
+              << "+==========================================+\n"
+              << "|  DC Operating Point  (.OP)               |\n"
+              << "+==========================================+" << COL_RESET << "\n\n";
 
     std::cout << COL_BOLD << "  Node Voltages\n" << COL_RESET;
-    std::cout << "  " << std::string(42, '-') << "\n";
+    std::cout << "  " << std::string(44, '-') << "\n";
     for (const auto* v : volts) {
         std::string val = eng(v->real, "V");
         std::cout << COL_GREEN << "  V(" << std::left << std::setw(12) << (v->name + ")")
                   << COL_RESET << "  " << COL_BOLD << std::right << std::setw(16) << val
                   << COL_RESET << "\n";
     }
+
     if (!amps.empty()) {
         std::cout << "\n" << COL_BOLD << "  Branch Currents\n" << COL_RESET;
-        std::cout << "  " << std::string(42, '-') << "\n";
+        std::cout << "  " << std::string(44, '-') << "\n";
         for (const auto* a : amps) {
             std::string val = eng(a->real, "A");
             std::cout << COL_YELLOW << "  I(" << std::left << std::setw(12) << (a->name + ")")
@@ -114,7 +112,60 @@ static void print_dc(const SimulationResult& r)
     std::cout << "\n";
 }
 
-// ── ASCII bar for AC ──────────────────────────────────────────────────
+// .DC: ASCII sweep table (source value → node voltages) 
+static void print_dc_sweep(const SimulationResult& r)
+{
+    if (r.data.empty()) return;
+
+    // Collect voltage node names from first point
+    std::vector<std::string> vnames, inames;
+    for (const auto& nv : r.data[0].values) {
+        if (nv.type == "voltage") vnames.push_back(nv.name);
+        else                      inames.push_back(nv.name);
+    }
+
+    std::cout << "\n" << COL_BOLD << COL_CYAN
+              << "+==========================================+\n"
+              << "|  DC Sweep  (.DC)                         |\n"
+              << "+==========================================+" << COL_RESET << "\n\n";
+
+    // Header
+    std::cout << COL_BOLD;
+    std::cout << "  " << std::setw(12) << "Sweep";
+    for (const auto& n : vnames) std::cout << "  " << std::setw(12) << ("V("+n+")");
+    for (const auto& n : inames) std::cout << "  " << std::setw(12) << ("I("+n+")");
+    std::cout << COL_RESET << "\n";
+    std::cout << "  " << std::string(14 + 14*(vnames.size()+inames.size()), '-') << "\n";
+
+    // Print every point (cap at 40 rows for readability)
+    size_t total = r.data.size();
+    size_t step  = std::max(size_t(1), total / 40);
+
+    for (size_t i = 0; i < total; i += step) {
+        const auto& pt = r.data[i];
+        std::cout << "  " << COL_CYAN << std::setw(12) << eng(pt.sweep_value, "") << COL_RESET;
+
+        for (const auto& name : vnames) {
+            double val = 0;
+            for (const auto& nv : pt.values)
+                if (nv.name == name) { val = nv.real; break; }
+            std::cout << COL_GREEN << "  " << std::setw(12) << eng(val, "V") << COL_RESET;
+        }
+        for (const auto& name : inames) {
+            double val = 0;
+            for (const auto& nv : pt.values)
+                if (nv.name == name) { val = nv.real; break; }
+            std::cout << COL_YELLOW << "  " << std::setw(12) << eng(val, "A") << COL_RESET;
+        }
+        std::cout << "\n";
+    }
+    if (step > 1)
+        std::cout << "  " << COL_YELLOW << "(showing " << (total/step) << " of "
+                  << total << " points)" << COL_RESET << "\n";
+    std::cout << "\n";
+}
+
+//  ASCII bar for AC
 static void print_ac_ascii(const SimulationResult& r)
 {
     if (r.data.empty()) return;
@@ -161,7 +212,7 @@ static void print_ac_ascii(const SimulationResult& r)
     }
 }
 
-// ── ASCII waveform for TRAN ───────────────────────────────────────────
+//  ASCII waveform for TRAN 
 static void print_tran_ascii(const SimulationResult& r)
 {
     if (r.data.empty()) return;
@@ -214,7 +265,7 @@ static void print_tran_ascii(const SimulationResult& r)
     }
 }
 
-// ── main ─────────────────────────────────────────────────────────────
+//  main 
 int main(int argc, char* argv[])
 {
     enable_ansi();
@@ -239,19 +290,20 @@ int main(int argc, char* argv[])
 
     SimulationResult result = simulate_file(path);
 
-    // ── --human / --plot both show terminal output ─────────────────
+    //  --human / --plot both show terminal output 
     if (do_human || do_plot) {
         std::cout << COL_BOLD << "\n  CircuitEngine  |  " << path << "\n" << COL_RESET;
         if (!result.success) {
             std::cerr << COL_RED << "\n  Error: " << result.error_msg << COL_RESET << "\n";
             return 2;
         }
-        if (result.analysis_type == AnalysisType::DC)   print_dc(result);
+        if (result.analysis_type == AnalysisType::OP)   print_op(result);
+        else if (result.analysis_type == AnalysisType::DC)   print_dc_sweep(result);
         else if (result.analysis_type == AnalysisType::AC)   print_ac_ascii(result);
         else if (result.analysis_type == AnalysisType::TRAN) print_tran_ascii(result);
     }
 
-    // ── --plot: write HTML and open browser ────────────────────────
+    //  --plot: write HTML and open browser 
     if (do_plot) {
         // Default output name: replace .cir with .html
         if (html_out.empty()) {
@@ -277,7 +329,7 @@ int main(int argc, char* argv[])
         return result.success ? 0 : 2;
     }
 
-    // ── default: JSON to stdout (C# / pipe mode) ───────────────────
+    //  default: JSON to stdout (C# / pipe mode) 
     if (!do_human) {
         std::cout << to_json(result);
     }

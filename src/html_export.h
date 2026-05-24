@@ -107,6 +107,7 @@ inline std::string to_html(const SimulationResult& res, const std::string& sourc
     margin-left: 12px;
     vertical-align: middle;
   }
+  .badge-op   { background: #37474f; color: #b0bec5; }
   .badge-dc   { background: #1565c0; color: #90caf9; }
   .badge-ac   { background: #4a148c; color: #ce93d8; }
   .badge-tran { background: #1b5e20; color: #a5d6a7; }
@@ -169,56 +170,120 @@ if (!R.success) {
   d.className = 'error';
   d.textContent = '✗ ' + R.error_msg;
   document.getElementById('grid').appendChild(d);
-} else if (R.analysis_type === 'dc') {
+} else if (R.analysis_type === 'op') {
 
-  // ── DC: table ──────────────────────────────────────────────────
-  const pt = R.data[0];
+  // ── .OP: operating-point table + bar chart ─────────────────────
+  const pt    = R.data[0];
   const volts = pt.values.filter(v => v.type === 'voltage');
   const amps  = pt.values.filter(v => v.type === 'current');
-  volts.sort((a,b) => a.name.localeCompare(b.name));
-  amps .sort((a,b) => a.name.localeCompare(b.name));
 
-  // Table card
-  const card = makeCard('Operating Point');
+  // Table
+  const card = makeCard('Operating Point  (.OP)');
   const tbl  = document.createElement('table');
-  tbl.innerHTML = '<tr><th>Node / Branch</th><th>Type</th><th style="text-align:right">Value</th></tr>';
-  for (const v of volts) {
+  tbl.innerHTML = '<tr><th>Signal</th><th>Type</th><th style="text-align:right">Value</th></tr>';
+  for (const v of volts)
     tbl.innerHTML += `<tr>
       <td class="name">V(${v.name})</td>
       <td class="type">voltage</td>
       <td class="value">${eng(v.real,'V')}</td></tr>`;
-  }
-  for (const a of amps) {
+  for (const a of amps)
     tbl.innerHTML += `<tr>
       <td class="name">I(${a.name})</td>
       <td class="type">current</td>
       <td class="value" style="color:#ffa726">${eng(a.real,'A')}</td></tr>`;
-  }
   card.appendChild(tbl);
 
-  // Bar chart card (voltages)
+  // Bar chart — voltages only
   if (volts.length) {
-    const card2 = makeCard('Node Voltages');
-    const cv = makeCanvas(card2);
-    new Chart(cv, {
+    const c2 = makeCard('Node Voltages  (.OP)');
+    new Chart(makeCanvas(c2), {
       type: 'bar',
       data: {
         labels: volts.map(v => v.name),
-        datasets: [{
-          data: volts.map(v => v.real),
-          backgroundColor: COLORS.slice(0, volts.length),
-          borderRadius: 4
-        }]
+        datasets: [{ data: volts.map(v => v.real),
+                     backgroundColor: COLORS.slice(0, volts.length),
+                     borderRadius: 4 }]
       },
       options: {
         plugins: { legend: { display: false } },
         scales: {
           x: { ticks: { color: '#90caf9' }, grid: { color: '#2a2d3a' } },
-          y: { ticks: { color: '#aaa',
-                        callback: v => eng(v,'V') },
+          y: { ticks: { color: '#aaa', callback: v => eng(v,'V') },
                grid: { color: '#2a2d3a' } }
         }
       }
+    });
+  }
+
+} else if (R.analysis_type === 'dc') {
+
+  // ── .DC: sweep charts — one line per node/branch ───────────────
+  const sweepVals = R.data.map(p => p.sweep_value);
+
+  // Collect signal names (preserve order from first data point)
+  const vnames = R.data[0].values
+    .filter(v => v.type === 'voltage').map(v => v.name);
+  const inames = R.data[0].values
+    .filter(v => v.type === 'current').map(v => v.name);
+
+  // x-axis label: the sweep source name (stored in subtitle)
+  const srcLabel = R.data[0] ? 'Source Value' : 'V';
+
+  const dcLineOpts = (ylabel, unitLabel) => ({
+    animation: false,
+    plugins: {
+      legend: { labels: { color: '#aaa', boxWidth: 12 } },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${ctx.dataset.label}: ${eng(ctx.parsed.y, unitLabel)}`
+        }
+      }
+    },
+    scales: {
+      x: {
+        type: 'linear',
+        ticks: { color: '#aaa', callback: v => eng(v, unitLabel === 'V' ? 'V' : 'A') },
+        grid: { color: '#2a2d3a' },
+        title: { display: true, text: 'Sweep value', color: '#78909c' }
+      },
+      y: {
+        ticks: { color: '#aaa', callback: v => eng(v, unitLabel) },
+        grid:  { color: '#2a2d3a' },
+        title: { display: true, text: ylabel, color: '#78909c' }
+      }
+    },
+    elements: { point: { radius: 0 } }
+  });
+
+  function buildDCDatasets(names, unitLabel) {
+    return names.map((name, ci) => ({
+      label: name,
+      data: sweepVals.map((sv, i) => {
+        const nv = R.data[i].values.find(v => v.name === name);
+        return { x: sv, y: nv ? nv.real : null };
+      }),
+      borderColor: COLORS[ci % COLORS.length],
+      borderWidth: 2,
+      tension: 0.1,
+      pointRadius: sweepVals.length < 50 ? 3 : 0
+    }));
+  }
+
+  if (vnames.length) {
+    const c = makeCard('Node Voltages vs Sweep  (.DC)');
+    new Chart(makeCanvas(c), {
+      type: 'line',
+      data: { datasets: buildDCDatasets(vnames, 'V') },
+      options: dcLineOpts('Voltage [V]', 'V')
+    });
+  }
+
+  if (inames.length) {
+    const c = makeCard('Branch Currents vs Sweep  (.DC)');
+    new Chart(makeCanvas(c), {
+      type: 'line',
+      data: { datasets: buildDCDatasets(inames, 'A') },
+      options: dcLineOpts('Current [A]', 'A')
     });
   }
 

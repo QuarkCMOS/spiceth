@@ -8,3 +8,5 @@ R2  mid  GND  7k
 * VCCS: G1 amplifies V(mid) by Gm=0.002 into out node
 G1  out  GND  mid  GND  0.002
 R3  out  GND  500
+
+.dc V1 0 30 0.1

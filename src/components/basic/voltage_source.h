@@ -42,6 +42,8 @@ public:
         z(k) += V;
     }
 
+    void set_dc_value(double v) { dc_ = v; }
+
     std::string type_name() const override { return "VoltageSource"; }
     double dc_value() const { return dc_; }
     std::complex<double> ac_value() const { return ac_; }

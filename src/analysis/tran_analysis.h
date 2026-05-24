@@ -37,7 +37,6 @@ public:
             int size    = n_nodes + n_extra;
 
             // Initial condition vector (default = 0)
-            // ==========================================================
             // DC Operating Point initialization
             Eigen::VectorXd x_prev = Eigen::VectorXd::Zero(size);
             {

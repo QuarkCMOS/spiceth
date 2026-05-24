@@ -1,0 +1,10 @@
+RC DC voltage divider test
+* V(mid) = 10 * 7k/(3k+7k) = 7V
+* I(V1)  = -10/10k = -1mA
+
+V1  vcc  GND  10
+R1  vcc  mid  3k
+R2  mid  GND  7k
+
+.dc V1 0 10 1
+.end

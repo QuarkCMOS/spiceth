@@ -9,7 +9,7 @@
  * {
  *   "success": true,
  *   "error_msg": "",
- *   "analysis_type": "dc",           // "dc" | "ac" | "tran"
+ *   "analysis_type": "dc",           // "op" | "dc" | "ac" | "tran"
  *   "node_map": { "n1": 0, "n2": 1 },
  *   "data": [
  *     {

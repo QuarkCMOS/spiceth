@@ -1,1 +1,4 @@
 *.exe
+*.html
+__pycache__
+tests/*/*.json

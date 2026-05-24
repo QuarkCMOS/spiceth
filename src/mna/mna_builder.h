@@ -17,22 +17,7 @@
 
 namespace CircuitEngine {
 
-// ──────────────────────────────────────────────────────────────────
 //  Circuit – holds topology + parsed directives
-// ──────────────────────────────────────────────────────────────────
-struct AnalysisConfig {
-    AnalysisType type  = AnalysisType::DC;
-    // DC: nothing extra
-    // AC
-    SweepType sweep    = SweepType::DEC;
-    int       points   = 10;
-    double    f_start  = 1.0;
-    double    f_end    = 1e6;
-    // TRAN
-    double    tstep    = 1e-6;
-    double    tstop    = 1e-3;
-    double    tstart   = 0.0;
-};
 
 using InitialCondition = std::tuple<char, std::string, double>; // (kind, name, value)
 
@@ -65,14 +50,12 @@ public:
     }
 };
 
-// ──────────────────────────────────────────────────────────────────
 //  MNABuilder
-// ──────────────────────────────────────────────────────────────────
 class MNABuilder {
 public:
     explicit MNABuilder(Circuit& circuit) : circuit_(circuit) {}
 
-    /// Build vs_index: assigns extra MNA rows for V/VCVS/CCVS/Inductors.
+    // Build vs_index: assigns extra MNA rows for V/VCVS/CCVS/Inductors.
     std::unordered_map<std::string, int> build_vs_index(SimMode mode) const
     {
         std::unordered_map<std::string, int> vs_index;
@@ -93,8 +76,8 @@ public:
         return vs_index;
     }
 
-    /// Assemble MNA matrices for the given context.
-    /// Returns (A, z) as complex; for DC/TRAN the imaginary parts are zero.
+    // Assemble MNA matrices for the given context.
+    // Returns (A, z) as complex; for DC/TRAN the imaginary parts are zero.
     std::pair<Eigen::MatrixXcd, Eigen::VectorXcd>
     build(StampContext& ctx) const
     {
@@ -114,16 +97,10 @@ public:
             throw std::runtime_error(
                 "Invalid circuit: empty MNA matrix");
         }
-
-        Eigen::MatrixXcd A =
-            Eigen::MatrixXcd::Zero(size, size);
-
-        Eigen::VectorXcd z =
-            Eigen::VectorXcd::Zero(size);
-
+        Eigen::MatrixXcd A = Eigen::MatrixXcd::Zero(size, size);
+        Eigen::VectorXcd z = Eigen::VectorXcd::Zero(size);
         for (const auto& comp : circuit_.components)
             comp->stamp(A, z, ctx);
-
         return {A, z};
     }
 
