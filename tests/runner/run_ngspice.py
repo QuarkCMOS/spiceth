@@ -1,5 +1,7 @@
 """
 run_ngspice.py — Run ngspice on a netlist and write golden JSON output.
+
+Raw-file parsing is delegated entirely to spicelib (via utils.parse_raw).
 """
 
 import argparse
@@ -12,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from utils import parse_raw, raw_to_engine_json, save_json
 
 
-#  Set this if ngspice is not on PATH 
+# Set this if ngspice is not on PATH
 NGSPICE_BIN = r"E:\ADMIN\AppData\Spice64\bin\ngspice.exe"
 # Windows example: NGSPICE_BIN = r"E:\ADMIN\AppData\Spice64\bin\ngspice.exe"
 
@@ -92,14 +94,14 @@ def run_ngspice(netlist_path: Path, raw_path: Path) -> None:
 
 
 def generate_golden(netlist_path: Path, out_path: Path) -> dict:
-    """Full pipeline: netlist → ngspice raw → golden JSON."""
+    """Full pipeline: netlist → ngspice raw → golden JSON (parsed by spicelib)."""
     with tempfile.TemporaryDirectory() as tmpdir:
         raw_path = Path(tmpdir) / "sim.raw"
         print(f"  [ngspice] Running {netlist_path.name} ...", flush=True)
         run_ngspice(netlist_path, raw_path)
 
-        print(f"  [ngspice] Parsing raw file ...", flush=True)
-        raw = parse_raw(raw_path)
+        print(f"  [ngspice] Parsing raw file with spicelib ...", flush=True)
+        raw = parse_raw(raw_path)   # ← spicelib-backed parser in utils.py
 
     golden = raw_to_engine_json(raw)
     save_json(golden, out_path)
@@ -126,20 +128,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-#  DEBUG HELPER (chạy trực tiếp để dump raw file) 
-def dump_raw(raw_path_str: str):
-    raw = Path(raw_path_str)
-    data = raw.read_bytes()
-    print(f"Size: {len(data)} bytes")
-    print("=== First 500 bytes as text (latin-1) ===")
-    print(data[:500].decode("latin-1", errors="replace"))
-    print("=== Hex dump first 200 bytes ===")
-    for i in range(0, min(200, len(data)), 16):
-        chunk = data[i:i+16]
-        hex_part = " ".join(f"{b:02x}" for b in chunk)
-        asc_part = "".join(chr(b) if 32 <= b < 127 else "." for b in chunk)
-        print(f"  {i:04x}: {hex_part:<48}  {asc_part}")
-
-if __name__ == "__main__" and len(sys.argv) == 3 and sys.argv[1] == "--dump":
-    dump_raw(sys.argv[2])

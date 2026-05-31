@@ -53,10 +53,10 @@ public:
     {
         // VCCS: I = Gm*(V_nc_p - V_nc_m) flowing from n_p to n_m
         // KCL contribution: current leaves n_p, enters n_m
-        if (n_p_ && nc_p_) A(n_p_.value(), nc_p_.value()) -= Gm_;
-        if (n_p_ && nc_m_) A(n_p_.value(), nc_m_.value()) += Gm_;
-        if (n_m_ && nc_p_) A(n_m_.value(), nc_p_.value()) += Gm_;
-        if (n_m_ && nc_m_) A(n_m_.value(), nc_m_.value()) -= Gm_;
+        if (n_p_ && nc_p_) A(n_p_.value(), nc_p_.value()) += Gm_;
+        if (n_p_ && nc_m_) A(n_p_.value(), nc_m_.value()) -= Gm_;
+        if (n_m_ && nc_p_) A(n_m_.value(), nc_p_.value()) -= Gm_;
+        if (n_m_ && nc_m_) A(n_m_.value(), nc_m_.value()) += Gm_;
     }
 
     std::string type_name() const override { return "VCCS"; }
@@ -90,7 +90,7 @@ public:
 
         if (n_p_) { A(n_p_.value(), k) += 1.0; A(k, n_p_.value()) += 1.0; }
         if (n_m_) { A(n_m_.value(), k) -= 1.0; A(k, n_m_.value()) -= 1.0; }
-        A(k, k_ctrl) += Rm_;
+        A(k, k_ctrl) -= Rm_;
     }
 
     std::string type_name() const override { return "CCVS"; }
@@ -118,8 +118,8 @@ public:
         int k_ctrl = ctx.vs_index->at(vctrl_);
         // I_out = A_ * I(vctrl); current flows INTO n_p and OUT of n_m.
         // KCL at n_p: conductances sum = +I_out → A(n_p, k_ctrl) -= A_ (current into node subtracts from LHS)
-        if (n_p_) A(n_p_.value(), k_ctrl) -= A_;
-        if (n_m_) A(n_m_.value(), k_ctrl) += A_;
+        if (n_p_) A(n_p_.value(), k_ctrl) += A_;
+        if (n_m_) A(n_m_.value(), k_ctrl) -= A_;
     }
 
     std::string type_name() const override { return "CCCS"; }

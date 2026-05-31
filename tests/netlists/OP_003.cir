@@ -1,0 +1,8 @@
+
+V1 n1 0 DC 12
+
+R1 n1 n2 2k
+R2 n2 0 4k
+
+.OP
+.END

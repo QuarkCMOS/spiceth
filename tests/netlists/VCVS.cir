@@ -1,0 +1,9 @@
+
+V1 ctrl 0 DC 1
+
+E1 out 0 ctrl 0 10
+
+R1 out 0 1k
+
+.OP
+.END

@@ -1,0 +1,11 @@
+
+VCTRL sense 0 DC 1
+
+R1 sense 0 1k
+
+H1 out 0 VCTRL 1000
+
+R2 out 0 1k
+
+.OP
+.END

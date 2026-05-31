@@ -1,0 +1,8 @@
+
+V1 in 0 DC 5
+
+R1 in out 100
+L1 out 0 10m
+
+.TRAN 1u 5m
+.END

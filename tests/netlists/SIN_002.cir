@@ -1,0 +1,5 @@
+
+V1 in 0 SIN(1 5 1000)
+
+.TRAN 1u 5m
+.END

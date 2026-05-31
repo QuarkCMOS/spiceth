@@ -1,0 +1,7 @@
+
+I1 n1 0 PULSE(0 1m 0 1u 1u 5m 10m)
+
+R1 n1 0 1k
+
+.TRAN 1u 30m
+.END

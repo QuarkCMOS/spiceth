@@ -1,0 +1,6 @@
+
+C1 n1 0 1u IC=5
+L1 n1 0 1m
+
+.TRAN 1u 10m
+.END

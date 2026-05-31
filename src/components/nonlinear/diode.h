@@ -52,14 +52,15 @@ public:
         Vd = Vd_prev + dv;
 
         // Exponential clamping (SPICE Vcrit)
-        double V_CRIT = n * Vt * std::log(n * Vt / (std::sqrt(2.0) * Is));
-        double arg;
-        if (Vd > V_CRIT) {
-            double exp_crit = std::exp(V_CRIT / (n * Vt));
-            arg = exp_crit * (1.0 + (Vd - V_CRIT) / (n * Vt));
-        } else {
-            arg = std::exp(std::clamp(Vd / (n * Vt), -500.0, 500.0));
-        }
+        //double V_CRIT = n * Vt * std::log(n * Vt / (std::sqrt(2.0) * Is));
+        //double arg;
+        //if (Vd > V_CRIT) {
+        //    double exp_crit = std::exp(V_CRIT / (n * Vt));
+        //    arg = exp_crit * (1.0 + (Vd - V_CRIT) / (n * Vt));
+        //} else {
+        //    arg = std::exp(std::clamp(Vd / (n * Vt), -500.0, 500.0));
+        //}
+        double arg = std::exp(std::clamp(Vd/(n*Vt),-100.0,100.0));    
 
         double Id  = Is * (arg - 1.0);
         double Gd  = std::max(Is / (n * Vt) * arg, 1e-12);

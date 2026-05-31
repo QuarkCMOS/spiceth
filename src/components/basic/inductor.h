@@ -24,9 +24,16 @@ public:
             break;
 
         case SimMode::AC: {
-            // Admittance  Y = 1 / (j*omega*L)
-            std::complex<double> Yl = 1.0 / (std::complex<double>{0.0, ctx.omega * L_});
-            addG(A, i_, j_, Yl);
+            // Model as voltage source: V_L = j*omega*L * I_L
+            // Extra MNA row k holds I_L directly in the solution vector.
+            if (!ctx.vs_index || ctx.vs_index->find(name_) == ctx.vs_index->end())
+                throw std::runtime_error(name_ + ": Inductor not indexed");
+            int k = ctx.vs_index->at(name_);
+            // KCL stamps: current k flows into node i, out of node j
+            if (i_) { A(i_.value(), k) += 1.0; A(k, i_.value()) += 1.0; }
+            if (j_) { A(j_.value(), k) -= 1.0; A(k, j_.value()) -= 1.0; }
+            // V_L = j*omega*L * I_L  →  -j*omega*L * I_L + V_i - V_j = 0
+            A(k, k) -= std::complex<double>{0.0, ctx.omega * L_};
             break;
         }
 

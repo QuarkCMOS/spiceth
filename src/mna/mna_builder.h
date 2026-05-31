@@ -68,7 +68,7 @@ public:
                       || dynamic_cast<CCVS*>(comp.get())         != nullptr;
             bool is_l  = dynamic_cast<Inductor*>(comp.get())     != nullptr;
 
-            if (is_vs || (is_l && (mode == SimMode::DC || mode == SimMode::TRAN))) {
+            if (is_vs || is_l) {
                 vs_index[comp->name()] = base + k;
                 ++k;
             }
