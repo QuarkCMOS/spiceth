@@ -1,4 +1,5 @@
 *.exe
 *.html
 __pycache__
-tests/*/*.json
+tests/golden
+tests/results

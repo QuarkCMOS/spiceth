@@ -30,8 +30,8 @@ public:
         std::complex<double> V;
 
         switch (ctx.mode) {
-        case SimMode::DC:   V = dc_; break;
-        case SimMode::AC:   V = ac_; break;
+        case SimMode::DC: V = tran_ ? eval_transient(*tran_, 0.0) : dc_; break;
+        case SimMode::AC: V = ac_; break;
         case SimMode::TRAN:
             V = tran_ ? eval_transient(*tran_, ctx.time) : dc_;
             break;

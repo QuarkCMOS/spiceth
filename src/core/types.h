@@ -116,6 +116,7 @@ struct SinParams {
 
 struct TransientSignal {
     SignalType type = SignalType::DC_CONST;
+    double dc_value = 0.0;
     std::optional<PulseParams> pulse;
     std::optional<SinParams>   sin;
 };

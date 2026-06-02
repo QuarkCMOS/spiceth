@@ -100,6 +100,14 @@ def generate_golden(netlist_path: Path, out_path: Path) -> dict:
         print(f"  [ngspice] Running {netlist_path.name} ...", flush=True)
         run_ngspice(netlist_path, raw_path)
 
+        # Save raw file as human-readable text alongside the golden JSON
+        raw_txt_path = out_path.with_suffix(".raw.txt")
+        raw_txt_path.write_text(
+            raw_path.read_text(encoding="utf-8", errors="replace"),
+            encoding="utf-8",
+        )
+        print(f"  [ngspice] Raw text saved → {raw_txt_path}")
+
         print(f"  [ngspice] Parsing raw file with spicelib ...", flush=True)
         raw = parse_raw(raw_path)   # ← spicelib-backed parser in utils.py
 

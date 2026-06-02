@@ -16,17 +16,25 @@ two different solvers are normal).  Instead we check:
 1. Structural checks (always strict):
    - analysis_type must match
    - same set of variable names
-   - same number of data points (for .tran: adaptive-timestep tolerance applied)
 
-2. Numerical checks (with tolerance):
-   - For each data point, for each variable:
-       |engine - golden| <= max(tol_abs, tol_rel * |golden|)
+2. Sweep-axis alignment (.tran only):
+   For each engine timestep (fixed grid), we look for the matching time in
+   ngspice's adaptive output:
+     a) Exact match found  → compare directly.
+     b) No exact match     → find the two ngspice points that bracket the
+        engine time and linearly interpolate.
+        If either bracket point is further than `interp_warn_dt` from the
+        engine time a WARNING is issued (sparse ngspice region).
+     c) Engine time is outside ngspice's time range → error.
+
+3. Numerical checks (with tolerance):
+   - For each engine data point, for each variable:
+       |engine - ngspice_interpolated| <= max(tol_abs, tol_rel * |ngspice_interpolated|)
    Default: tol_rel=1e-3 (0.1%), tol_abs=1e-9
 
-3. Sweep axis check:
-   - Sweep values (time / frequency) must match within tol_rel.
-   - For .tran with different point counts (adaptive timestep), engine values
-     are linearly interpolated onto the golden time grid before comparison.
+4. Non-tran analyses (.op, .dc, .ac):
+   Point counts must be equal; comparison is done point-by-point (no
+   interpolation needed).
 
 Statistics computed (always):
    - max_abs_error        per-signal and global
@@ -36,6 +44,7 @@ Statistics computed (always):
 """
 
 import argparse
+import bisect
 import json
 import math
 import sys
@@ -80,22 +89,86 @@ def _find_value(point: dict, name: str) -> dict | None:
     return None
 
 
-def _interp(x: float, xs: list[float], ys: list[float]) -> float:
-    """Linear interpolation of ys at x, given sorted xs."""
-    if x <= xs[0]:
-        return ys[0]
-    if x >= xs[-1]:
-        return ys[-1]
-    # binary search
-    lo, hi = 0, len(xs) - 1
-    while lo + 1 < hi:
-        mid = (lo + hi) // 2
-        if xs[mid] <= x:
-            lo = mid
-        else:
-            hi = mid
-    t = (x - xs[lo]) / (xs[hi] - xs[lo]) if xs[hi] != xs[lo] else 0.0
-    return ys[lo] + t * (ys[hi] - ys[lo])
+def _interp_linear(x: float, x0: float, x1: float, y0: float, y1: float) -> float:
+    """Linear interpolation between two points."""
+    if x1 == x0:
+        return y0
+    t = (x - x0) / (x1 - x0)
+    return y0 + t * (y1 - y0)
+
+
+# ── Ngspice time-series lookup ────────────────────────────────────────────────
+
+class NgspiceSeries:
+    """
+    Pre-built lookup structure for one variable's time-series from ngspice
+    adaptive output.  Supports O(log n) bracket search + linear interpolation.
+    """
+
+    def __init__(
+        self,
+        times: list[float],
+        real_vals: list[float],
+        imag_vals: list[float],
+        exact_tol: float = 1e-15,
+    ):
+        self.times = times          # sorted ascending
+        self.real  = real_vals
+        self.imag  = imag_vals
+        self.exact_tol = exact_tol
+
+    def query(
+        self,
+        t: float,
+        interp_warn_dt: float,
+    ) -> "tuple[float, float, str | None]":
+        """
+        Return (real, imag, warning_message_or_None) at time t.
+
+        warning_message is set when either bracket point is further than
+        interp_warn_dt from t (sparse ngspice region).
+        """
+        times = self.times
+
+        # Out-of-range guard
+        if t < times[0] - self.exact_tol:
+            return 0.0, 0.0, f"engine t={t:.6g} is before ngspice start t={times[0]:.6g}"
+        if t > times[-1] + self.exact_tol:
+            return 0.0, 0.0, f"engine t={t:.6g} is after ngspice end t={times[-1]:.6g}"
+
+        # Binary search for left bracket: largest times[lo] <= t
+        lo = bisect.bisect_right(times, t) - 1
+        lo = max(lo, 0)
+
+        # Exact match check
+        if abs(times[lo] - t) <= self.exact_tol:
+            return self.real[lo], self.imag[lo], None
+
+        hi = lo + 1
+        if hi >= len(times):
+            # t is at or beyond the last point
+            return self.real[-1], self.imag[-1], None
+
+        # Check exact match on hi as well
+        if abs(times[hi] - t) <= self.exact_tol:
+            return self.real[hi], self.imag[hi], None
+
+        # Linear interpolation
+        r_val = _interp_linear(t, times[lo], times[hi], self.real[lo], self.real[hi])
+        i_val = _interp_linear(t, times[lo], times[hi], self.imag[lo], self.imag[hi])
+
+        # Warn if bracket points are too far from engine timestep
+        warn = None
+        dt_lo = abs(t - times[lo])
+        dt_hi = abs(times[hi] - t)
+        if dt_lo > interp_warn_dt or dt_hi > interp_warn_dt:
+            warn = (
+                f"t={t:.6g}: ngspice bracket gap too large "
+                f"(lo@{times[lo]:.6g} Δ={dt_lo:.3e}, hi@{times[hi]:.6g} Δ={dt_hi:.3e}); "
+                f"interpolation may be inaccurate (threshold={interp_warn_dt:.3e})"
+            )
+
+        return r_val, i_val, warn
 
 
 # ── Per-signal statistics ─────────────────────────────────────────────────────
@@ -134,7 +207,7 @@ class DiffResult:
         self.global_n:         int   = 0
         self.worst_case_signal: str  = ""
         self.analysis_type:    str   = ""
-        self.adaptive_tran:    bool  = False   # True when tran point counts differ
+        self.tran_interpolated: bool = False   # True when tran interpolation used
 
     @property
     def passed(self) -> bool:
@@ -156,18 +229,25 @@ class DiffResult:
             self.signal_stats[key] = SignalStats(key)
         self.signal_stats[key].update(abs_e, rel_e)
         self._update_global(abs_e, rel_e)
-        # track worst-case signal by max_rel
         if self.signal_stats[key].max_rel >= self.global_max_rel:
             self.worst_case_signal = key
 
 
 def compare(
-    golden: dict[str, Any],
-    result: dict[str, Any],
+    golden: dict[str, Any],        # ngspice reference (adaptive timestep)
+    result: dict[str, Any],        # engine output (fixed timestep)
     tol_rel: float = 1e-2,
     tol_abs: float = 1e-8,
     max_errors: int = 20,
+    interp_warn_dt: float | None = None,  # None → auto (10× engine dt)
+    exact_tol: float = 1e-15,
 ) -> DiffResult:
+    """
+    Compare engine (fixed-timestep) output against ngspice (adaptive) reference.
+
+    For .tran analyses the engine's time grid is authoritative.  For each
+    engine timestep we look up (or interpolate) the ngspice value, then compare.
+    """
     dr = DiffResult()
 
     def err(msg: str):
@@ -175,7 +255,9 @@ def compare(
             dr.errors.append(msg)
 
     def warn(msg: str):
-        dr.warnings.append(msg)
+        # Deduplicate warnings (bracket-gap warnings can flood otherwise)
+        if msg not in dr.warnings:
+            dr.warnings.append(msg)
 
     # ── 1. Top-level structural checks ────────────────────────────────────────
     dr.checks += 1
@@ -189,29 +271,12 @@ def compare(
             f"engine={r_atype!r}"
         )
 
-    dr.checks += 1
     g_points = golden["data"]
     r_points = result["data"]
 
-    is_tran = (g_atype == "tran")
-    adaptive = is_tran and len(g_points) != len(r_points)
-    dr.adaptive_tran = adaptive
-
-    if len(g_points) != len(r_points):
-        if is_tran:
-            warn(
-                f"Point count differs (golden={len(g_points)} engine={len(r_points)}): "
-                f"adaptive-timestep interpolation will be used."
-            )
-        else:
-            err(
-                f"Point count mismatch: golden={len(g_points)} engine={len(r_points)}"
-            )
-
     if not g_points:
-        warn("No data points to compare.")
+        warn("No data points in ngspice golden.")
         return dr
-
     if not r_points:
         err("Engine returned no data points (empty 'data' list).")
         return dr
@@ -230,39 +295,21 @@ def compare(
 
     common_names = g_names & r_names
 
-    # ── 2. Build lookup structures for adaptive tran ──────────────────────────
-    # For adaptive tran we interpolate engine values onto the golden time grid.
-    # For all other cases we compare point-by-point.
-    if adaptive:
-        r_sweep_vals = [rp["sweep_value"] for rp in r_points]
-        # per-variable arrays for engine
-        r_series: dict[str, dict[str, list[float]]] = {}
-        for name in common_names:
-            r_series[name] = {"real": [], "imag": []}
-        for rp in r_points:
-            for name in common_names:
-                rv = _find_value(rp, name)
-                if rv:
-                    r_series[name]["real"].append(rv["real"])
-                    r_series[name]["imag"].append(rv["imag"])
-                else:
-                    r_series[name]["real"].append(0.0)
-                    r_series[name]["imag"].append(0.0)
+    is_tran = (g_atype == "tran")
 
-    # ── 3. Point-by-point numerical comparison ────────────────────────────────
-    for i, gp in enumerate(g_points):
-        g_sweep = gp["sweep_value"]
+    # ── 2. Non-tran: strict point-count match, point-by-point ─────────────────
+    if not is_tran:
+        dr.checks += 1
+        if len(g_points) != len(r_points):
+            err(
+                f"Point count mismatch: golden={len(g_points)} engine={len(r_points)}"
+            )
+            return dr
 
-        if adaptive:
-            # Interpolate engine onto golden sweep value
-            r_sweep_at_i = g_sweep   # golden defines the reference grid
-        else:
-            if i >= len(r_points):
-                break
-            rp = r_points[i]
+        for i, (gp, rp) in enumerate(zip(g_points, r_points)):
+            g_sweep = gp["sweep_value"]
             r_sweep = rp["sweep_value"]
 
-            # Sweep axis check — skip for .op (dummy sweep values differ by convention)
             if g_atype != "op":
                 dr.checks += 1
                 if not _close(g_sweep, r_sweep, tol_rel=1e-6, tol_abs=1e-30):
@@ -272,35 +319,110 @@ def compare(
                         f"(abs_err={_abs_err(g_sweep, r_sweep):.3e})"
                     )
 
-        for name in sorted(common_names):
+            for name in sorted(common_names):
+                gv = _find_value(gp, name)
+                rv = _find_value(rp, name)
+                if gv is None:
+                    continue
+
+                for part in ("real", "imag"):
+                    dr.checks += 1
+                    g_val = gv[part]
+                    r_val = rv[part] if rv else 0.0
+
+                    abs_e = _abs_err(g_val, r_val)
+                    rel_e = _rel_err(g_val, r_val, tol_abs)
+                    key   = f"{name}.{part}"
+                    dr._record(key, abs_e, rel_e)
+
+                    if not _close(g_val, r_val, tol_rel, tol_abs):
+                        err(
+                            f"Point[{i}] {name}.{part}: "
+                            f"golden={g_val:.6g}  engine={r_val:.6g}  "
+                            f"abs_err={abs_e:.3e}  rel_err={rel_e:.3e}"
+                        )
+        return dr
+
+    # ── 3. Tran: engine timesteps are authoritative; look up ngspice ──────────
+    dr.tran_interpolated = True
+
+    # Build ngspice time array
+    g_times = [gp["sweep_value"] for gp in g_points]
+
+    # Auto interp_warn_dt: 10× the median engine dt (robust to variable step)
+    resolved_warn_dt: float
+    if interp_warn_dt is None:
+        r_times = [rp["sweep_value"] for rp in r_points]
+        if len(r_times) >= 2:
+            dts = [r_times[k+1] - r_times[k] for k in range(len(r_times)-1)]
+            dts.sort()
+            median_dt = dts[len(dts) // 2]
+            resolved_warn_dt = 10.0 * median_dt
+        else:
+            resolved_warn_dt = float("inf")
+    else:
+        resolved_warn_dt = interp_warn_dt
+
+    # Build per-variable NgspiceSeries
+    ng_series: dict[str, NgspiceSeries] = {}
+    for name in common_names:
+        real_vals = []
+        imag_vals = []
+        for gp in g_points:
             gv = _find_value(gp, name)
-            if gv is None:
+            if gv:
+                real_vals.append(gv["real"])
+                imag_vals.append(gv["imag"])
+            else:
+                real_vals.append(0.0)
+                imag_vals.append(0.0)
+        ng_series[name] = NgspiceSeries(g_times, real_vals, imag_vals, exact_tol)
+
+    # Point count info (informational only for tran)
+    if len(g_points) != len(r_points):
+        warn(
+            f"ngspice has {len(g_points)} adaptive points; "
+            f"engine has {len(r_points)} fixed-timestep points. "
+            f"Comparing at each engine timestep (interpolating ngspice where needed)."
+        )
+
+    # Walk engine timesteps
+    warned_bracket: set[str] = set()  # avoid duplicate bracket warnings per signal
+
+    for i, rp in enumerate(r_points):
+        r_time = rp["sweep_value"]
+
+        for name in sorted(common_names):
+            rv = _find_value(rp, name)
+            if rv is None:
                 continue
+
+            series = ng_series[name]
 
             for part in ("real", "imag"):
                 dr.checks += 1
-                g_val = gv[part]
+                r_val = rv[part]
 
-                if adaptive:
-                    r_val = _interp(
-                        g_sweep,
-                        r_sweep_vals,
-                        r_series[name][part],
-                    )
-                else:
-                    rv = _find_value(rp, name)
-                    r_val = rv[part] if rv else 0.0
+                # Query ngspice series at engine time
+                ng_real, ng_imag, bracket_warn = series.query(r_time, resolved_warn_dt)
+                g_val = ng_real if part == "real" else ng_imag
 
-                abs_e = _abs_err(g_val, r_val)
-                rel_e = _rel_err(g_val, r_val, tol_abs)
+                if bracket_warn:
+                    # Emit warning once per unique message to avoid spam
+                    bkey = f"{name}.{part}:{r_time:.6g}"
+                    if bkey not in warned_bracket:
+                        warned_bracket.add(bkey)
+                        warn(bracket_warn)
+
+                abs_e = _abs_err(r_val, g_val)
+                rel_e = _rel_err(r_val, g_val, tol_abs)
                 key   = f"{name}.{part}"
-
                 dr._record(key, abs_e, rel_e)
 
-                if not _close(g_val, r_val, tol_rel, tol_abs):
+                if not _close(r_val, g_val, tol_rel, tol_abs):
                     err(
-                        f"Point[{i}] {name}.{part}: "
-                        f"golden={g_val:.6g}  engine={r_val:.6g}  "
+                        f"Point[{i}] t={r_time:.6g}  {name}.{part}: "
+                        f"engine={r_val:.6g}  ngspice={g_val:.6g}  "
                         f"abs_err={abs_e:.3e}  rel_err={rel_e:.3e}"
                     )
 
@@ -323,8 +445,11 @@ def print_report(
     print(f"  Golden : {golden_path}")
     print(f"  Result : {result_path}")
     print(f"  Tol    : rel={tol_rel:.0e}  abs={tol_abs:.0e}")
-    if dr.adaptive_tran:
-        print(YELLOW("  Mode   : adaptive-timestep (.tran) — engine interpolated onto golden grid"))
+    if dr.tran_interpolated:
+        print(YELLOW(
+            "  Mode   : .tran — comparing at each engine timestep; "
+            "ngspice interpolated where needed"
+        ))
     print(BOLD(CYAN("──────────────────────────────────────────────────")))
 
     if dr.warnings:
@@ -384,6 +509,13 @@ def main():
                         help="Absolute tolerance (default: 1e-9)")
     parser.add_argument("--max-errors", type=int, default=20,
                         help="Max errors to display (default: 20)")
+    parser.add_argument(
+        "--interp-warn-dt", type=float, default=None,
+        help=(
+            "Warn when either ngspice bracket point is further than this "
+            "from the engine timestep (default: 10× median engine dt)."
+        ),
+    )
     args = parser.parse_args()
 
     golden = json.loads(Path(args.golden).read_text())
@@ -394,6 +526,7 @@ def main():
         tol_rel=args.tol_rel,
         tol_abs=args.tol_abs,
         max_errors=args.max_errors,
+        interp_warn_dt=args.interp_warn_dt,
     )
     print_report(args.golden, args.result, dr, args.tol_rel, args.tol_abs)
 

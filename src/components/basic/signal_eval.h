@@ -10,7 +10,7 @@ inline double eval_transient(const TransientSignal& sig, double t)
 {
     switch (sig.type) {
     case SignalType::DC_CONST:
-        return 0.0;
+        return sig.dc_value;
 
     case SignalType::PULSE: {
         const auto& p = sig.pulse.value();
