@@ -1,8 +1,9 @@
 
-V1 in 0 PULSE(0 5 0 1u 1u 5m 10m)
+V1 in 0 SIN(0 5 1000)
+.model Dtest D(Is = 1e-14)
 
 R1 in out 1k
-C1 out 0 1u
+D1 out 0 Dtest
 
-.TRAN 1u 20m
+.TRAN 1u 5m
 .END

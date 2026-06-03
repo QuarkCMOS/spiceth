@@ -3,5 +3,5 @@ V1 in 0 SIN(0 10 1000)
 
 R1 in 0 1k
 
-.TRAN 1u 5m
+.TRAN 10n 500u
 .END

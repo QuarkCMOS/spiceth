@@ -6,6 +6,10 @@
 #include <optional>
 #include <string>
 
+static const double EXP80 = std::exp(80.0);
+static const double EXPneg79 = std::exp(-79.0);
+
+
 namespace CircuitEngine {
 
 struct DiodeModel {
@@ -60,10 +64,23 @@ public:
         //} else {
         //    arg = std::exp(std::clamp(Vd / (n * Vt), -500.0, 500.0));
         //}
-        double arg = std::exp(std::clamp(Vd/(n*Vt),-100.0,100.0));    
-
-        double Id  = Is * (arg - 1.0);
-        double Gd  = std::max(Is / (n * Vt) * arg, 1e-12);
+        double x = Vd / (n * Vt);
+        double exp_like;
+        double dexp_dx; 
+        if (x > 80) {
+            exp_like = (x - 79) * EXP80;
+            dexp_dx = EXP80;
+        }
+        else if (x < -79) {
+            exp_like = (x + 80) * EXPneg79;
+            dexp_dx = EXPneg79;
+        }
+        else {
+            exp_like = std::exp(x);
+            dexp_dx = exp_like;
+        }
+        double Id  = Is * (exp_like - 1.0);
+        double Gd  = std::max(Is / (n * Vt) * dexp_dx, 1e-12);
         double Ieq = Id - Gd * Vd;
 
         // Stamp conductance

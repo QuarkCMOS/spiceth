@@ -1,11 +1,9 @@
 
-V1 in 0 SIN(0 10 50)
+V1 in 0 SIN(0 10 100000)
 
 .MODEL DIO D(Is=1e-14)
 D1 in out DIO
 R1 out 0 1k
 
-
-
-.TRAN 100u 100m
+.TRAN 1n 500n
 .END
