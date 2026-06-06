@@ -83,6 +83,7 @@ TEST_CASES = [
     ("RLC_Resonance",       "RLC_Resonance.cir"),
     ("DiodeRectifier",      "DiodeRectifier.cir"),
     ("RLStep",              "RLStep.cir"),
+    ("DIODE_AC",           "DIODE_AC.cir")
     # Add more here, e.g.:
 ]
 

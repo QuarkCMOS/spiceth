@@ -82,6 +82,25 @@ inline std::string to_html(const SimulationResult& res, const std::string& sourc
     text-transform: uppercase;
     letter-spacing: .06em;
   }
+  .xy-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  .xy-controls select,
+  .xy-controls button {
+    background: #0f1117;
+    color: #e0e0e0;
+    border: 1px solid #2a2d3a;
+    border-radius: 6px;
+    padding: 6px 10px;
+  }
+
+  .xy-controls button {
+    cursor: pointer;
+  }
   canvas { width: 100% !important; }
 
   /* DC table */
@@ -160,6 +179,7 @@ function makeCanvas(card) {
   return cv;
 }
 
+
 // ── Badge ────────────────────────────────────────────────────────
 const badge = document.getElementById('badge');
 badge.textContent = R.analysis_type;
@@ -217,75 +237,298 @@ if (!R.success) {
 
 } else if (R.analysis_type === 'dc') {
 
-  // ── .DC: sweep charts — one line per node/branch ───────────────
   const sweepVals = R.data.map(p => p.sweep_value);
 
-  // Collect signal names (preserve order from first data point)
-  const vnames = R.data[0].values
-    .filter(v => v.type === 'voltage').map(v => v.name);
-  const inames = R.data[0].values
-    .filter(v => v.type === 'current').map(v => v.name);
+  const voltages =
+      R.data[0].values.filter(v => v.type === 'voltage');
 
-  // x-axis label: the sweep source name (stored in subtitle)
-  const srcLabel = R.data[0] ? 'Source Value' : 'V';
+  const currents =
+      R.data[0].values.filter(v => v.type === 'current');
+
+  // =====================================================
+  // Standard sweep plots
+  // =====================================================
+
+  const vnames = voltages.map(v => v.name);
+  const inames = currents.map(v => v.name);
 
   const dcLineOpts = (ylabel, unitLabel) => ({
-    animation: false,
-    plugins: {
-      legend: { labels: { color: '#aaa', boxWidth: 12 } },
-      tooltip: {
-        callbacks: {
-          label: ctx => `${ctx.dataset.label}: ${eng(ctx.parsed.y, unitLabel)}`
+    animation:false,
+    plugins:{
+      legend:{
+        labels:{ color:'#aaa' }
+      }
+    },
+    scales:{
+      x:{
+        type:'linear',
+        grid:{ color:'#2a2d3a' },
+        ticks:{ color:'#aaa' }
+      },
+      y:{
+        grid:{ color:'#2a2d3a' },
+        ticks:{
+          color:'#aaa',
+          callback:v=>eng(v,unitLabel)
         }
       }
     },
-    scales: {
-      x: {
-        type: 'linear',
-        ticks: { color: '#aaa', callback: v => eng(v, unitLabel === 'V' ? 'V' : 'A') },
-        grid: { color: '#2a2d3a' },
-        title: { display: true, text: 'Sweep value', color: '#78909c' }
-      },
-      y: {
-        ticks: { color: '#aaa', callback: v => eng(v, unitLabel) },
-        grid:  { color: '#2a2d3a' },
-        title: { display: true, text: ylabel, color: '#78909c' }
-      }
-    },
-    elements: { point: { radius: 0 } }
+    elements:{
+      point:{ radius:0 }
+    }
   });
 
-  function buildDCDatasets(names, unitLabel) {
-    return names.map((name, ci) => ({
-      label: name,
-      data: sweepVals.map((sv, i) => {
-        const nv = R.data[i].values.find(v => v.name === name);
-        return { x: sv, y: nv ? nv.real : null };
+  function buildDCDatasets(names)
+  {
+    return names.map((name,ci)=>({
+      label:name,
+      data:sweepVals.map((sv,i)=>{
+        const nv =
+          R.data[i].values.find(v=>v.name===name);
+
+        return {
+          x:sv,
+          y:nv ? nv.real : null
+        };
       }),
-      borderColor: COLORS[ci % COLORS.length],
-      borderWidth: 2,
-      tension: 0.1,
-      pointRadius: sweepVals.length < 50 ? 3 : 0
+      borderColor:COLORS[ci % COLORS.length],
+      borderWidth:2,
+      pointRadius:sweepVals.length < 50 ? 3 : 0,
+      tension:0.1
     }));
   }
 
-  if (vnames.length) {
-    const c = makeCard('Node Voltages vs Sweep  (.DC)');
-    new Chart(makeCanvas(c), {
-      type: 'line',
-      data: { datasets: buildDCDatasets(vnames, 'V') },
-      options: dcLineOpts('Voltage [V]', 'V')
+  if(vnames.length)
+  {
+    const c = makeCard('Node Voltages vs Sweep');
+
+    new Chart(makeCanvas(c),{
+      type:'line',
+      data:{
+        datasets:buildDCDatasets(vnames)
+      },
+      options:dcLineOpts('Voltage','V')
     });
   }
 
-  if (inames.length) {
-    const c = makeCard('Branch Currents vs Sweep  (.DC)');
-    new Chart(makeCanvas(c), {
-      type: 'line',
-      data: { datasets: buildDCDatasets(inames, 'A') },
-      options: dcLineOpts('Current [A]', 'A')
+  if(inames.length)
+  {
+    const c = makeCard('Branch Currents vs Sweep');
+
+    new Chart(makeCanvas(c),{
+      type:'line',
+      data:{
+        datasets:buildDCDatasets(inames)
+      },
+      options:dcLineOpts('Current','A')
     });
   }
+
+  // =====================================================
+  // XY Plot
+  // =====================================================
+
+  function getSignalSeries(name)
+  {
+    return R.data.map(pt=>{
+      const v =
+        pt.values.find(x=>x.name===name);
+
+      return v ? v.real : null;
+    });
+  }
+
+  function evalSignal(expr)
+  {
+    expr = expr.trim();
+
+    if(expr.startsWith('V(') &&
+       expr.endsWith(')'))
+    {
+      const inside =
+        expr.substring(2,expr.length-1);
+
+      if(inside.includes(','))
+      {
+        const parts =
+          inside.split(',');
+
+        const va =
+          getSignalSeries(parts[0].trim());
+
+        const vb =
+          getSignalSeries(parts[1].trim());
+
+        return va.map(
+          (v,i)=>v-vb[i]
+        );
+      }
+
+      return getSignalSeries(
+        inside.trim()
+      );
+    }
+
+    if(expr.startsWith('I(') &&
+       expr.endsWith(')'))
+    {
+      const inside =
+        expr.substring(2,expr.length-1);
+
+      return getSignalSeries(
+        inside.trim()
+      );
+    }
+
+    return [];
+  }
+
+  const xyCard =
+    makeCard('Custom XY Plot');
+
+  const controls =
+    document.createElement('div');
+
+  controls.className =
+    'xy-controls';
+
+  const xSel =
+    document.createElement('select');
+
+  const ySel =
+    document.createElement('select');
+
+  function addOption(sel,text)
+  {
+    const o =
+      document.createElement('option');
+
+    o.value = text;
+    o.textContent = text;
+
+    sel.appendChild(o);
+  }
+
+  voltages.forEach(v=>{
+    addOption(xSel,`V(${v.name})`);
+    addOption(ySel,`V(${v.name})`);
+  });
+
+  currents.forEach(v=>{
+    addOption(xSel,`I(${v.name})`);
+    addOption(ySel,`I(${v.name})`);
+  });
+
+  for(let i=0;i<voltages.length;i++)
+  {
+    for(let j=i+1;j<voltages.length;j++)
+    {
+      const expr =
+        `V(${voltages[i].name},${voltages[j].name})`;
+
+      addOption(xSel,expr);
+      addOption(ySel,expr);
+    }
+  }
+
+  const btn =
+    document.createElement('button');
+
+  btn.textContent = 'Plot';
+
+  controls.appendChild(xSel);
+  controls.appendChild(ySel);
+  controls.appendChild(btn);
+
+  xyCard.appendChild(controls);
+
+  const cv =
+    makeCanvas(xyCard);
+
+  let xyChart = null;
+
+  function drawXY()
+  {
+    const xs =
+      evalSignal(xSel.value);
+
+    const ys =
+      evalSignal(ySel.value);
+
+    const pts = [];
+
+    for(let i=0;i<xs.length;i++)
+    {
+      pts.push({
+        x:xs[i],
+        y:ys[i]
+      });
+    }
+
+    if(xyChart)
+      xyChart.destroy();
+
+    xyChart =
+      new Chart(cv,{
+        type:'line',
+        data:{
+          datasets:[{
+            label:
+              `${ySel.value} vs ${xSel.value}`,
+            data:pts,
+            borderColor:'#42a5f5',
+            borderWidth:2,
+            pointRadius:0,
+            tension:0
+          }]
+        },
+        options:{
+          parsing:false,
+          animation:false,
+          scales:{
+            x:{
+              type:'linear',
+              grid:{
+                color:'#2a2d3a'
+              },
+              ticks:{
+                color:'#aaa'
+              },
+              title:{
+                display:true,
+                text:xSel.value,
+                color:'#aaa'
+              }
+            },
+            y:{
+              type:'linear',
+              grid:{
+                color:'#2a2d3a'
+              },
+              ticks:{
+                color:'#aaa'
+              },
+              title:{
+                display:true,
+                text:ySel.value,
+                color:'#aaa'
+              }
+            }
+          }
+        }
+      });
+  }
+
+  btn.onclick = drawXY;
+
+  xSel.selectedIndex = 0;
+  ySel.selectedIndex =
+      Math.min(
+        1,
+        ySel.options.length-1
+      );
+
+  drawXY();
 
 } else if (R.analysis_type === 'ac') {
 

@@ -81,6 +81,11 @@ public:
         }
         double Id  = Is * (exp_like - 1.0);
         double Gd  = std::max(Is / (n * Vt) * dexp_dx, 1e-12);
+
+        if (ctx.mode == SimMode::AC) {
+            addG(A, a_, c_, Gd);
+            return;
+        }
         double Ieq = Id - Gd * Vd;
 
         // Stamp conductance

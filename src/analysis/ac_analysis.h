@@ -8,6 +8,8 @@
 #include <numbers>
 
 constexpr double PI = 3.14159265358979323846;
+constexpr int    NEWTON_MAX_ITER = 50;
+constexpr double NEWTON_TOL      = 1e-8;
 
 namespace CircuitEngine {
 
@@ -25,6 +27,47 @@ public:
 
         try {
             const AnalysisConfig& cfg = circuit_.analysis;
+
+            // DC Operating Point
+            auto vs_index = builder_.build_vs_index(SimMode::DC);
+            int n_nodes = static_cast<int>(circuit_.node_map.size());
+            int n_extra = static_cast<int>(vs_index.size());
+            int size    = n_nodes + n_extra;
+
+            Eigen::VectorXd x_prev = Eigen::VectorXd::Zero(size);
+                {
+                    Eigen::VectorXd x_guess = Eigen::VectorXd::Zero(size);
+
+                    bool converged = false;
+                    for (int iter = 0; iter < NEWTON_MAX_ITER; ++iter) {
+                        StampContext ctx;
+                        ctx.mode   = SimMode::DC;
+                        ctx.x      = &x_guess;
+                        ctx.x_prev = &x_guess;
+
+                        auto [A, z] = builder_.build(ctx);
+
+                        Eigen::VectorXcd res_c = A * x_guess.cast<std::complex<double>>() - z;
+                        Eigen::VectorXd res = res_c.real();
+
+                        Eigen::MatrixXd A_real = A.real();
+                        Eigen::VectorXd dx = Solver::solve_linear_real(A_real, -res);
+
+                        x_guess += dx;
+
+                        if (dx.lpNorm<Eigen::Infinity>() < NEWTON_TOL) {
+                            converged = true;
+                            break;
+                        }
+                    }
+
+                    if (!converged)
+                        throw std::runtime_error(
+                            "DC operating point failed to converge");
+
+                    x_prev = x_guess;
+                }   
+
             auto freqs = generate_frequencies(cfg);
 
             for (double f : freqs) {
@@ -33,6 +76,8 @@ public:
                 StampContext ctx;
                 ctx.mode  = SimMode::AC;
                 ctx.omega = omega;
+                ctx.x = &x_prev;
+                ctx.x_prev = &x_prev;
 
                 auto [A, z] = builder_.build(ctx);
                 Eigen::VectorXcd x = Solver::solve_linear(A, z);
